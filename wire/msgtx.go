@@ -289,11 +289,17 @@ func (tokenID TokenIdentity) String() string {
 func (t *TxOut) SerializeSize() int {
 	// Value 8 bytes + serialized varint size for the length of PkScript +
 	// PkScript bytes + TokenID opcode bytes.
-	l := len(t.PkScript)
+	scriptLen := len(t.PkScript)
 	if t.TokenID == NDR {
-		l++
+		if scriptLen == 0 || t.PkScript[scriptLen-1] != OP_NDR {
+			scriptLen++
+		}
+	} else {
+		if scriptLen > 0 && t.PkScript[scriptLen-1] == OP_NDR {
+			scriptLen--
+		}
 	}
-	return 8 + VarIntSerializeSize(uint64(l)) + l
+	return 8 + VarIntSerializeSize(uint64(scriptLen)) + scriptLen
 }
 
 // NewTxOut returns a new bitcoin transaction output with the provided
@@ -1051,8 +1057,15 @@ func WriteTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
 		return err
 	}
 
+	scriptLen := len(to.PkScript)
 	if to.TokenID == NDR {
-		to.PkScript = append(to.PkScript, OP_NDR)
+		if scriptLen == 0 || to.PkScript[scriptLen-1] != OP_NDR {
+			to.PkScript = append(to.PkScript, OP_NDR)
+		}
+	} else {
+		if scriptLen > 0 && to.PkScript[scriptLen-1] == OP_NDR {
+			to.PkScript = to.PkScript[:scriptLen-1]
+		}
 	}
 
 	return WriteVarBytes(w, pver, to.PkScript)
