@@ -173,7 +173,13 @@ func (r FutureListUnspentResult) Receive() ([]btcjson.ListUnspentResult, error) 
 //
 // See ListUnspent for the blocking version and more details.
 func (c *Client) ListUnspentAsync() FutureListUnspentResult {
-	cmd := btcjson.NewListUnspentCmd(nil, nil, nil)
+	cmd := btcjson.NewListUnspentCmd(nil, nil, nil, nil)
+	return c.sendCmd(cmd)
+}
+
+// ListUnspentTokenAsync returns ...
+func (c *Client) ListUnspentTokenAsync(token string) FutureListUnspentResult {
+	cmd := btcjson.NewListUnspentCmd(&token, nil, nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -182,8 +188,8 @@ func (c *Client) ListUnspentAsync() FutureListUnspentResult {
 // on the returned instance.
 //
 // See ListUnspentMin for the blocking version and more details.
-func (c *Client) ListUnspentMinAsync(minConf int) FutureListUnspentResult {
-	cmd := btcjson.NewListUnspentCmd(&minConf, nil, nil)
+func (c *Client) ListUnspentMinAsync(token string, minConf int) FutureListUnspentResult {
+	cmd := btcjson.NewListUnspentCmd(&token, &minConf, nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -192,8 +198,8 @@ func (c *Client) ListUnspentMinAsync(minConf int) FutureListUnspentResult {
 // on the returned instance.
 //
 // See ListUnspentMinMax for the blocking version and more details.
-func (c *Client) ListUnspentMinMaxAsync(minConf, maxConf int) FutureListUnspentResult {
-	cmd := btcjson.NewListUnspentCmd(&minConf, &maxConf, nil)
+func (c *Client) ListUnspentMinMaxAsync(token string, minConf, maxConf int) FutureListUnspentResult {
+	cmd := btcjson.NewListUnspentCmd(&token, &minConf, &maxConf, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -202,13 +208,13 @@ func (c *Client) ListUnspentMinMaxAsync(minConf, maxConf int) FutureListUnspentR
 // function on the returned instance.
 //
 // See ListUnspentMinMaxAddresses for the blocking version and more details.
-func (c *Client) ListUnspentMinMaxAddressesAsync(minConf, maxConf int, addrs []btcutil.Address) FutureListUnspentResult {
+func (c *Client) ListUnspentMinMaxAddressesAsync(token string, minConf, maxConf int, addrs []btcutil.Address) FutureListUnspentResult {
 	addrStrs := make([]string, 0, len(addrs))
 	for _, a := range addrs {
 		addrStrs = append(addrStrs, a.EncodeAddress())
 	}
 
-	cmd := btcjson.NewListUnspentCmd(&minConf, &maxConf, &addrStrs)
+	cmd := btcjson.NewListUnspentCmd(&token, &minConf, &maxConf, &addrStrs)
 	return c.sendCmd(cmd)
 }
 
@@ -219,25 +225,30 @@ func (c *Client) ListUnspent() ([]btcjson.ListUnspentResult, error) {
 	return c.ListUnspentAsync().Receive()
 }
 
+// ListUnspentToken returns ...
+func (c *Client) ListUnspentToken(token string) ([]btcjson.ListUnspentResult, error) {
+	return c.ListUnspentTokenAsync(token).Receive()
+}
+
 // ListUnspentMin returns all unspent transaction outputs known to a wallet,
 // using the specified number of minimum conformations and default number of
 // maximum confiramtions (999999) as a filter.
-func (c *Client) ListUnspentMin(minConf int) ([]btcjson.ListUnspentResult, error) {
-	return c.ListUnspentMinAsync(minConf).Receive()
+func (c *Client) ListUnspentMin(token string, minConf int) ([]btcjson.ListUnspentResult, error) {
+	return c.ListUnspentMinAsync(token, minConf).Receive()
 }
 
 // ListUnspentMinMax returns all unspent transaction outputs known to a wallet,
 // using the specified number of minimum and maximum number of confirmations as
 // a filter.
-func (c *Client) ListUnspentMinMax(minConf, maxConf int) ([]btcjson.ListUnspentResult, error) {
-	return c.ListUnspentMinMaxAsync(minConf, maxConf).Receive()
+func (c *Client) ListUnspentMinMax(token string, minConf, maxConf int) ([]btcjson.ListUnspentResult, error) {
+	return c.ListUnspentMinMaxAsync(token, minConf, maxConf).Receive()
 }
 
 // ListUnspentMinMaxAddresses returns all unspent transaction outputs that pay
 // to any of specified addresses in a wallet using the specified number of
 // minimum and maximum number of confirmations as a filter.
-func (c *Client) ListUnspentMinMaxAddresses(minConf, maxConf int, addrs []btcutil.Address) ([]btcjson.ListUnspentResult, error) {
-	return c.ListUnspentMinMaxAddressesAsync(minConf, maxConf, addrs).Receive()
+func (c *Client) ListUnspentMinMaxAddresses(token string, minConf, maxConf int, addrs []btcutil.Address) ([]btcjson.ListUnspentResult, error) {
+	return c.ListUnspentMinMaxAddressesAsync(token, minConf, maxConf, addrs).Receive()
 }
 
 // FutureListSinceBlockResult is a future promise to deliver the result of a
