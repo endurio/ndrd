@@ -292,6 +292,15 @@ func TokenID(pkScript []byte) TokenIdentity {
 	return STB
 }
 
+// StripTokenID strips the prepended token opcode and data
+func StripTokenID(pkScript []byte) []byte {
+	scriptLen := len(pkScript)
+	if scriptLen > 0 || pkScript[scriptLen-1] != OP_NDR {
+		return pkScript[:scriptLen-1]
+	}
+	return pkScript
+}
+
 // TokenID returns the token identity recorded in the TxOut
 func (t *TxOut) TokenID() TokenIdentity {
 	return TokenID(t.PkScript)
