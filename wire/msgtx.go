@@ -263,6 +263,40 @@ type TxOut struct {
 	PkScript []byte
 }
 
+// TokenIdentity defines a token identity
+type TokenIdentity bool
+
+// STB defines token identity for Stabilio
+const (
+	OP_TOKEN = 0xb8 // 184 - AKA OP_NOP9
+	OP_NDR   = 0xb9 // 185 - AKA OP_NOP10
+
+	STB TokenIdentity = false // Stablio
+	NDR TokenIdentity = true  // Endurio
+)
+
+// String returns an unique name in byte slice
+func (tokenID TokenIdentity) String() string {
+	if tokenID == NDR {
+		return "NDR"
+	}
+	return "STB"
+}
+
+// TokenID returns the token identity recorded in the PkScript
+func TokenID(pkScript []byte) TokenIdentity {
+	scriptLen := len(pkScript)
+	if scriptLen == 0 || pkScript[scriptLen-1] != OP_NDR {
+		return NDR
+	}
+	return STB
+}
+
+// TokenID returns the token identity recorded in the TxOut
+func (t *TxOut) TokenID() TokenIdentity {
+	return TokenID(t.PkScript)
+}
+
 // SerializeSize returns the number of bytes it would take to serialize the
 // the transaction output.
 func (t *TxOut) SerializeSize() int {
@@ -274,6 +308,18 @@ func (t *TxOut) SerializeSize() int {
 // NewTxOut returns a new bitcoin transaction output with the provided
 // transaction value and public key script.
 func NewTxOut(value int64, pkScript []byte) *TxOut {
+	return &TxOut{
+		Value:    value,
+		PkScript: pkScript,
+	}
+}
+
+// NewTxOutToken returns a new bitcoin transaction output with the provided
+// transaction value, public key script and token identity.
+func NewTxOutToken(value int64, pkScript []byte, tokenID TokenIdentity) *TxOut {
+	if tokenID == NDR {
+		pkScript = append(pkScript, OP_NDR)
+	}
 	return &TxOut{
 		Value:    value,
 		PkScript: pkScript,
