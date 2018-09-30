@@ -253,6 +253,11 @@ type SpentTxOut struct {
 	IsCoinBase bool
 }
 
+// TokenID returns the identity of the token for the output
+func (stxo *SpentTxOut) TokenID() wire.TokenIdentity {
+	return wire.TokenID(stxo.PkScript)
+}
+
 // FetchSpendJournal attempts to retrieve the spend journal, or the set of
 // outputs spent for the target block. This provides a view of all the outputs
 // that will be consumed once the target block is connected to the end of the
