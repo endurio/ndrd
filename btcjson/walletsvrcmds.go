@@ -413,7 +413,6 @@ func NewListTransactionsCmd(account *string, count, from *int, includeWatchOnly 
 
 // ListUnspentCmd defines the listunspent JSON-RPC command.
 type ListUnspentCmd struct {
-	Token     *string
 	MinConf   *int `jsonrpcdefault:"1"`
 	MaxConf   *int `jsonrpcdefault:"9999999"`
 	Addresses *[]string
@@ -424,9 +423,8 @@ type ListUnspentCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewListUnspentCmd(token *string, minConf, maxConf *int, addresses *[]string) *ListUnspentCmd {
+func NewListUnspentCmd(minConf, maxConf *int, addresses *[]string) *ListUnspentCmd {
 	return &ListUnspentCmd{
-		Token:     token,
 		MinConf:   minConf,
 		MaxConf:   maxConf,
 		Addresses: addresses,

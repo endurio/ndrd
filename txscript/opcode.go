@@ -222,8 +222,8 @@ const (
 	OP_NOP6                = 0xb5 // 181
 	OP_NOP7                = 0xb6 // 182
 	OP_NOP8                = 0xb7 // 183
-	OP_NOP9                = 0xb8 // 184 - AKA OP_TOKEN
-	OP_NOP10               = 0xb9 // 185 - AKA OP_NDR
+	OP_NOP9                = 0xb8 // 184
+	OP_NOP10               = 0xb9 // 185
 	OP_UNKNOWN186          = 0xba // 186
 	OP_UNKNOWN187          = 0xbb // 187
 	OP_UNKNOWN188          = 0xbc // 188
@@ -294,9 +294,6 @@ const (
 	OP_PUBKEYHASH          = 0xfd // 253 - bitcoin core internal
 	OP_PUBKEY              = 0xfe // 254 - bitcoin core internal
 	OP_INVALIDOPCODE       = 0xff // 255 - bitcoin core internal
-
-	OP_TOKEN = wire.OP_TOKEN // 184 - AKA OP_NOP9
-	OP_NDR   = wire.OP_NDR   // 185 - AKA OP_NOP10
 )
 
 // Conditional execution constants.
