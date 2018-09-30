@@ -286,7 +286,7 @@ func (tokenID TokenIdentity) String() string {
 // TokenID returns the token identity recorded in the PkScript
 func TokenID(pkScript []byte) TokenIdentity {
 	scriptLen := len(pkScript)
-	if scriptLen == 0 || pkScript[scriptLen-1] != OP_NDR {
+	if scriptLen > 0 && pkScript[scriptLen-1] == OP_NDR {
 		return NDR
 	}
 	return STB
@@ -295,7 +295,7 @@ func TokenID(pkScript []byte) TokenIdentity {
 // StripTokenID strips the prepended token opcode and data
 func StripTokenID(pkScript []byte) []byte {
 	scriptLen := len(pkScript)
-	if scriptLen > 0 || pkScript[scriptLen-1] != OP_NDR {
+	if scriptLen > 0 && pkScript[scriptLen-1] == OP_NDR {
 		return pkScript[:scriptLen-1]
 	}
 	return pkScript
