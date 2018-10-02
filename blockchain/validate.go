@@ -993,13 +993,6 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// implementation only currently uses memory for the side chain blocks,
 	// it isn't currently necessary.
 
-	// The coinbase for the Genesis block is not spendable, so just return
-	// an error now.
-	if node.hash.IsEqual(b.chainParams.GenesisHash) {
-		str := "the coinbase for the genesis block is not spendable"
-		return ruleError(ErrMissingTxOut, str)
-	}
-
 	// Ensure the view is for the node being checked.
 	parentHash := &block.MsgBlock().Header.PrevBlock
 	if !view.BestHash().IsEqual(parentHash) {

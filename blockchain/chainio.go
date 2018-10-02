@@ -1091,6 +1091,19 @@ func (b *BlockChain) createChainState() error {
 			return err
 		}
 
+		// Connect all coinbase txs of genesis block which is premined
+		view := NewUtxoViewpoint()
+		err = view.connectTransactions(genesisBlock, nil)
+		if err != nil {
+			return err
+		}
+
+		// Update the utxo set with premined coins
+		err = dbPutUtxoView(dbTx, view)
+		if err != nil {
+			return err
+		}
+
 		// Store the current best chain state into the database.
 		err = dbPutBestState(dbTx, b.stateSnapshot, node.workSum)
 		if err != nil {
