@@ -479,7 +479,8 @@ type SendFromCmd struct {
 	FromAccount string
 	ToAddress   string
 	Amount      float64 // In BTC
-	MinConf     *int    `jsonrpcdefault:"1"`
+	Token       *string
+	MinConf     *int `jsonrpcdefault:"1"`
 	Comment     *string
 	CommentTo   *string
 }
@@ -489,11 +490,12 @@ type SendFromCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewSendFromCmd(fromAccount, toAddress string, amount float64, minConf *int, comment, commentTo *string) *SendFromCmd {
+func NewSendFromCmd(fromAccount, toAddress string, amount float64, token *string, minConf *int, comment, commentTo *string) *SendFromCmd {
 	return &SendFromCmd{
 		FromAccount: fromAccount,
 		ToAddress:   toAddress,
 		Amount:      amount,
+		Token:       token,
 		MinConf:     minConf,
 		Comment:     comment,
 		CommentTo:   commentTo,

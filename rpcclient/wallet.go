@@ -559,9 +559,9 @@ func (r FutureSendFromResult) Receive() (*chainhash.Hash, error) {
 // returned instance.
 //
 // See SendFrom for the blocking version and more details.
-func (c *Client) SendFromAsync(fromAccount string, toAddress btcutil.Address, amount btcutil.Amount) FutureSendFromResult {
+func (c *Client) SendFromAsync(fromAccount string, toAddress btcutil.Address, amount btcutil.Amount, token string) FutureSendFromResult {
 	addr := toAddress.EncodeAddress()
-	cmd := btcjson.NewSendFromCmd(fromAccount, addr, amount.ToBTC(), nil,
+	cmd := btcjson.NewSendFromCmd(fromAccount, addr, amount.ToBTC(), &token, nil,
 		nil, nil)
 	return c.sendCmd(cmd)
 }
@@ -574,8 +574,8 @@ func (c *Client) SendFromAsync(fromAccount string, toAddress btcutil.Address, am
 //
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
-func (c *Client) SendFrom(fromAccount string, toAddress btcutil.Address, amount btcutil.Amount) (*chainhash.Hash, error) {
-	return c.SendFromAsync(fromAccount, toAddress, amount).Receive()
+func (c *Client) SendFrom(fromAccount string, toAddress btcutil.Address, amount btcutil.Amount, token string) (*chainhash.Hash, error) {
+	return c.SendFromAsync(fromAccount, toAddress, amount, token).Receive()
 }
 
 // SendFromMinConfAsync returns an instance of a type that can be used to get
@@ -583,9 +583,9 @@ func (c *Client) SendFrom(fromAccount string, toAddress btcutil.Address, amount 
 // the returned instance.
 //
 // See SendFromMinConf for the blocking version and more details.
-func (c *Client) SendFromMinConfAsync(fromAccount string, toAddress btcutil.Address, amount btcutil.Amount, minConfirms int) FutureSendFromResult {
+func (c *Client) SendFromMinConfAsync(fromAccount string, toAddress btcutil.Address, amount btcutil.Amount, token string, minConfirms int) FutureSendFromResult {
 	addr := toAddress.EncodeAddress()
-	cmd := btcjson.NewSendFromCmd(fromAccount, addr, amount.ToBTC(),
+	cmd := btcjson.NewSendFromCmd(fromAccount, addr, amount.ToBTC(), &token,
 		&minConfirms, nil, nil)
 	return c.sendCmd(cmd)
 }
@@ -599,8 +599,8 @@ func (c *Client) SendFromMinConfAsync(fromAccount string, toAddress btcutil.Addr
 //
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
-func (c *Client) SendFromMinConf(fromAccount string, toAddress btcutil.Address, amount btcutil.Amount, minConfirms int) (*chainhash.Hash, error) {
-	return c.SendFromMinConfAsync(fromAccount, toAddress, amount,
+func (c *Client) SendFromMinConf(fromAccount string, toAddress btcutil.Address, amount btcutil.Amount, token string, minConfirms int) (*chainhash.Hash, error) {
+	return c.SendFromMinConfAsync(fromAccount, toAddress, amount, token,
 		minConfirms).Receive()
 }
 
@@ -610,11 +610,11 @@ func (c *Client) SendFromMinConf(fromAccount string, toAddress btcutil.Address, 
 //
 // See SendFromComment for the blocking version and more details.
 func (c *Client) SendFromCommentAsync(fromAccount string,
-	toAddress btcutil.Address, amount btcutil.Amount, minConfirms int,
+	toAddress btcutil.Address, amount btcutil.Amount, token string, minConfirms int,
 	comment, commentTo string) FutureSendFromResult {
 
 	addr := toAddress.EncodeAddress()
-	cmd := btcjson.NewSendFromCmd(fromAccount, addr, amount.ToBTC(),
+	cmd := btcjson.NewSendFromCmd(fromAccount, addr, amount.ToBTC(), &token,
 		&minConfirms, &comment, &commentTo)
 	return c.sendCmd(cmd)
 }
@@ -631,10 +631,10 @@ func (c *Client) SendFromCommentAsync(fromAccount string,
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
 func (c *Client) SendFromComment(fromAccount string, toAddress btcutil.Address,
-	amount btcutil.Amount, minConfirms int,
+	amount btcutil.Amount, token string, minConfirms int,
 	comment, commentTo string) (*chainhash.Hash, error) {
 
-	return c.SendFromCommentAsync(fromAccount, toAddress, amount,
+	return c.SendFromCommentAsync(fromAccount, toAddress, amount, token,
 		minConfirms, comment, commentTo).Receive()
 }
 
