@@ -506,7 +506,8 @@ func NewSendFromCmd(fromAccount, toAddress string, amount float64, token *string
 type SendManyCmd struct {
 	FromAccount string
 	Amounts     map[string]float64 `jsonrpcusage:"{\"address\":amount,...}"` // In BTC
-	MinConf     *int               `jsonrpcdefault:"1"`
+	Token       *string
+	MinConf     *int `jsonrpcdefault:"1"`
 	Comment     *string
 }
 
@@ -515,10 +516,11 @@ type SendManyCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewSendManyCmd(fromAccount string, amounts map[string]float64, minConf *int, comment *string) *SendManyCmd {
+func NewSendManyCmd(fromAccount string, amounts map[string]float64, token *string, minConf *int, comment *string) *SendManyCmd {
 	return &SendManyCmd{
 		FromAccount: fromAccount,
 		Amounts:     amounts,
+		Token:       token,
 		MinConf:     minConf,
 		Comment:     comment,
 	}
@@ -528,6 +530,7 @@ func NewSendManyCmd(fromAccount string, amounts map[string]float64, minConf *int
 type SendToAddressCmd struct {
 	Address   string
 	Amount    float64
+	Token     *string
 	Comment   *string
 	CommentTo *string
 }
@@ -537,10 +540,11 @@ type SendToAddressCmd struct {
 //
 // The parameters which are pointers indicate they are optional.  Passing nil
 // for optional parameters will use the default value.
-func NewSendToAddressCmd(address string, amount float64, comment, commentTo *string) *SendToAddressCmd {
+func NewSendToAddressCmd(address string, amount float64, token, comment, commentTo *string) *SendToAddressCmd {
 	return &SendToAddressCmd{
 		Address:   address,
 		Amount:    amount,
+		Token:     token,
 		Comment:   comment,
 		CommentTo: commentTo,
 	}

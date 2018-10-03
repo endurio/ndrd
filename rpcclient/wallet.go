@@ -482,7 +482,7 @@ func (r FutureSendToAddressResult) Receive() (*chainhash.Hash, error) {
 // See SendToAddress for the blocking version and more details.
 func (c *Client) SendToAddressAsync(address btcutil.Address, amount btcutil.Amount) FutureSendToAddressResult {
 	addr := address.EncodeAddress()
-	cmd := btcjson.NewSendToAddressCmd(addr, amount.ToBTC(), nil, nil)
+	cmd := btcjson.NewSendToAddressCmd(addr, amount.ToBTC(), nil, nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -498,17 +498,29 @@ func (c *Client) SendToAddress(address btcutil.Address, amount btcutil.Amount) (
 	return c.SendToAddressAsync(address, amount).Receive()
 }
 
+// SendToAddressTokenAsync returns
+func (c *Client) SendToAddressTokenAsync(address btcutil.Address, amount btcutil.Amount, token string) FutureSendToAddressResult {
+	addr := address.EncodeAddress()
+	cmd := btcjson.NewSendToAddressCmd(addr, amount.ToBTC(), &token, nil, nil)
+	return c.sendCmd(cmd)
+}
+
+// SendToAddressToken sends
+func (c *Client) SendToAddressToken(address btcutil.Address, amount btcutil.Amount, token string) (*chainhash.Hash, error) {
+	return c.SendToAddressTokenAsync(address, amount, token).Receive()
+}
+
 // SendToAddressCommentAsync returns an instance of a type that can be used to
 // get the result of the RPC at some future time by invoking the Receive
 // function on the returned instance.
 //
 // See SendToAddressComment for the blocking version and more details.
 func (c *Client) SendToAddressCommentAsync(address btcutil.Address,
-	amount btcutil.Amount, comment,
+	amount btcutil.Amount, token, comment,
 	commentTo string) FutureSendToAddressResult {
 
 	addr := address.EncodeAddress()
-	cmd := btcjson.NewSendToAddressCmd(addr, amount.ToBTC(), &comment,
+	cmd := btcjson.NewSendToAddressCmd(addr, amount.ToBTC(), &token, &comment,
 		&commentTo)
 	return c.sendCmd(cmd)
 }
@@ -525,8 +537,8 @@ func (c *Client) SendToAddressCommentAsync(address btcutil.Address,
 //
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
-func (c *Client) SendToAddressComment(address btcutil.Address, amount btcutil.Amount, comment, commentTo string) (*chainhash.Hash, error) {
-	return c.SendToAddressCommentAsync(address, amount, comment,
+func (c *Client) SendToAddressComment(address btcutil.Address, amount btcutil.Amount, token, comment, commentTo string) (*chainhash.Hash, error) {
+	return c.SendToAddressCommentAsync(address, amount, token, comment,
 		commentTo).Receive()
 }
 
@@ -672,7 +684,7 @@ func (c *Client) SendManyAsync(fromAccount string, amounts map[btcutil.Address]b
 	for addr, amount := range amounts {
 		convertedAmounts[addr.EncodeAddress()] = amount.ToBTC()
 	}
-	cmd := btcjson.NewSendManyCmd(fromAccount, convertedAmounts, nil, nil)
+	cmd := btcjson.NewSendManyCmd(fromAccount, convertedAmounts, nil, nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -688,13 +700,28 @@ func (c *Client) SendMany(fromAccount string, amounts map[btcutil.Address]btcuti
 	return c.SendManyAsync(fromAccount, amounts).Receive()
 }
 
+// SendManyTokenAsync returns
+func (c *Client) SendManyTokenAsync(fromAccount string, amounts map[btcutil.Address]btcutil.Amount, token string) FutureSendManyResult {
+	convertedAmounts := make(map[string]float64, len(amounts))
+	for addr, amount := range amounts {
+		convertedAmounts[addr.EncodeAddress()] = amount.ToBTC()
+	}
+	cmd := btcjson.NewSendManyCmd(fromAccount, convertedAmounts, &token, nil, nil)
+	return c.sendCmd(cmd)
+}
+
+// SendManyToken sends
+func (c *Client) SendManyToken(fromAccount string, amounts map[btcutil.Address]btcutil.Amount, token string) (*chainhash.Hash, error) {
+	return c.SendManyTokenAsync(fromAccount, amounts, token).Receive()
+}
+
 // SendManyMinConfAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function on
 // the returned instance.
 //
 // See SendManyMinConf for the blocking version and more details.
 func (c *Client) SendManyMinConfAsync(fromAccount string,
-	amounts map[btcutil.Address]btcutil.Amount,
+	amounts map[btcutil.Address]btcutil.Amount, token string,
 	minConfirms int) FutureSendManyResult {
 
 	convertedAmounts := make(map[string]float64, len(amounts))
@@ -702,7 +729,7 @@ func (c *Client) SendManyMinConfAsync(fromAccount string,
 		convertedAmounts[addr.EncodeAddress()] = amount.ToBTC()
 	}
 	cmd := btcjson.NewSendManyCmd(fromAccount, convertedAmounts,
-		&minConfirms, nil)
+		&token, &minConfirms, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -716,10 +743,10 @@ func (c *Client) SendManyMinConfAsync(fromAccount string,
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
 func (c *Client) SendManyMinConf(fromAccount string,
-	amounts map[btcutil.Address]btcutil.Amount,
+	amounts map[btcutil.Address]btcutil.Amount, token string,
 	minConfirms int) (*chainhash.Hash, error) {
 
-	return c.SendManyMinConfAsync(fromAccount, amounts, minConfirms).Receive()
+	return c.SendManyMinConfAsync(fromAccount, amounts, token, minConfirms).Receive()
 }
 
 // SendManyCommentAsync returns an instance of a type that can be used to get
@@ -728,7 +755,7 @@ func (c *Client) SendManyMinConf(fromAccount string,
 //
 // See SendManyComment for the blocking version and more details.
 func (c *Client) SendManyCommentAsync(fromAccount string,
-	amounts map[btcutil.Address]btcutil.Amount, minConfirms int,
+	amounts map[btcutil.Address]btcutil.Amount, token string, minConfirms int,
 	comment string) FutureSendManyResult {
 
 	convertedAmounts := make(map[string]float64, len(amounts))
@@ -736,7 +763,7 @@ func (c *Client) SendManyCommentAsync(fromAccount string,
 		convertedAmounts[addr.EncodeAddress()] = amount.ToBTC()
 	}
 	cmd := btcjson.NewSendManyCmd(fromAccount, convertedAmounts,
-		&minConfirms, &comment)
+		&token, &minConfirms, &comment)
 	return c.sendCmd(cmd)
 }
 
@@ -751,10 +778,10 @@ func (c *Client) SendManyCommentAsync(fromAccount string,
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
 func (c *Client) SendManyComment(fromAccount string,
-	amounts map[btcutil.Address]btcutil.Amount, minConfirms int,
+	amounts map[btcutil.Address]btcutil.Amount, token string, minConfirms int,
 	comment string) (*chainhash.Hash, error) {
 
-	return c.SendManyCommentAsync(fromAccount, amounts, minConfirms,
+	return c.SendManyCommentAsync(fromAccount, amounts, token, minConfirms,
 		comment).Receive()
 }
 
