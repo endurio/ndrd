@@ -35,40 +35,44 @@ shift $((OPTIND-1))
 # addresses and keys
 MINING_ADDR=SUkMuEFAq5MgzrdFghNF6LB9N5W8e74Q81
 MINING_SKEY=Fs2ezDkpassKCSG1UpDqcV2ib1sC5NQNgAZRBsgk2Xgwj7jxLrk3
-WALLET_ADDR=SSwMMZKdfuK7oPjhEGuzVPtGVuGQfaG6Tb
-WALLET_SKEY=FudTNM3XSmTHzxHVkHHXHGAidcaYACK2hKiVLtZAmsuELsf7xShq
-
-if [[ $first -ne 0 ]]; then
-	IMPORT_SKEY=$MINING_SKEY
-else
-	IMPORT_SKEY=$WALLET_SKEY
-fi
 
 # process OPTs
 if [[ $remove -ne 0 ]]; then
 	rm -rf "$LOCALAPPDATA/btcd/data/simnet"
+	rm -rf "$LOCALAPPDATA/btcwallet/simnet"
 fi
-rm -rf "$LOCALAPPDATA/btcwallet/simnet"
+rm -rf "$LOCALAPPDATA/btcwalletTMP/simnet"
+
+CTL="btcctl --simnet --rpcuser=a --rpcpass=a --skipverify"
+CTLW="$CTL --wallet"
+
+BTCW="btcwallet --simnet --connect=localhost --username=a --password=a --createtemp"
 
 if [[ $daemon -ne 0 ]]; then
 	start btcd --simnet --rpcuser=a --rpcpass=a --miningaddr=$MINING_ADDR
-	sleep 2
+
+	if [[ $first -ne 0 ]]; then
+		sleep 2
+		$CTL generate 1024
+
+		start $BTCW --appdata="$LOCALAPPDATA/btcwallet"
+		sleep 5
+		WALLET_ADDR=`$CTLW getnewaddress`
+		taskkill -IM btcwallet.exe
+
+		start $BTCW --appdata="$LOCALAPPDATA/btcwalletTMP"
+		sleep 5
+		$CTLW walletpassphrase "password" 0
+		$CTLW importprivkey $MINING_SKEY
+		$CTLW sendfrom imported $WALLET_ADDR 30
+		$CTL generate 1
+		taskkill -IM btcwallet.exe
+	fi
 fi
 
 if [[ $wallet -ne 0 ]]; then
-	start btcwallet --simnet --connect=localhost --username=a --password=a --createtemp --appdata="$LOCALAPPDATA/btcwallet"
+	sleep 2
+	start $BTCW --appdata="$LOCALAPPDATA/btcwallet"
 	sleep 5
-
-	btcctl --simnet --rpcuser=a --rpcpass=a --skipverify --wallet walletpassphrase "password" 0
-	btcctl --simnet --rpcuser=a --rpcpass=a --skipverify --wallet importprivkey $IMPORT_SKEY
-	btcctl --simnet --rpcuser=a --rpcpass=a --skipverify --wallet settxfee 0
-
-	if [[ $first -ne 0 ]]; then
-		btcctl --simnet --rpcuser=a --rpcpass=a --skipverify generate 101
-		sleep 2
-
-		btcctl --simnet --rpcuser=a --rpcpass=a --skipverify --wallet sendfrom imported $WALLET_ADDR 50
-		btcctl --simnet --rpcuser=a --rpcpass=a --skipverify --wallet sendfrom1 imported $WALLET_ADDR 1
-		btcctl --simnet --rpcuser=a --rpcpass=a --skipverify generate 1
-	fi
+	$CTLW walletpassphrase "password" 0
 fi
