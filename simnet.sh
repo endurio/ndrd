@@ -33,8 +33,8 @@ shift $((OPTIND-1))
 [ "${1:-}" = "--" ] && shift
 
 # addresses and keys
-MINING_ADDR=SUkMuEFAq5MgzrdFghNF6LB9N5W8e74Q81
-MINING_SKEY=Fs2ezDkpassKCSG1UpDqcV2ib1sC5NQNgAZRBsgk2Xgwj7jxLrk3
+MINING_ADDR=SSwMMZKdfuK7oPjhEGuzVPtGVuGQfaG6Tb
+MINING_SKEY=FudTNM3XSmTHzxHVkHHXHGAidcaYACK2hKiVLtZAmsuELsf7xShq
 
 # process OPTs
 if [[ $remove -ne 0 ]]; then
@@ -64,7 +64,8 @@ if [[ $daemon -ne 0 ]]; then
 		sleep 5
 		$CTLW walletpassphrase "password" 0
 		$CTLW importprivkey $MINING_SKEY
-		$CTLW sendfrom imported $WALLET_ADDR 30
+		$CTLW sendfrom imported $WALLET_ADDR 4 NDR
+		$CTLW sendfrom imported $WALLET_ADDR 6 STB
 		$CTL generate 1
 		taskkill -IM btcwallet.exe
 	fi
