@@ -12,6 +12,8 @@ import (
 	"math"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec"
+
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
@@ -285,6 +287,13 @@ func readElement(r io.Reader, element interface{}) error {
 		}
 		return nil
 
+	case *btcec.CompactSignature:
+		_, err := io.ReadFull(r, e[:])
+		if err != nil {
+			return err
+		}
+		return nil
+
 	case *ServiceFlag:
 		rv, err := binarySerializer.Uint64(r, littleEndian)
 		if err != nil {
@@ -413,6 +422,13 @@ func writeElement(w io.Writer, element interface{}) error {
 		return nil
 
 	case *chainhash.Hash:
+		_, err := w.Write(e[:])
+		if err != nil {
+			return err
+		}
+		return nil
+
+	case *btcec.CompactSignature:
 		_, err := w.Write(e[:])
 		if err != nil {
 			return err
