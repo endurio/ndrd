@@ -63,6 +63,32 @@ func (h *BlockHeader) BlockHash() chainhash.Hash {
 	return chainhash.DoubleHashH(buf.Bytes())
 }
 
+// BlockHashWithoutSignature does BlockHash without signature.
+func (h *BlockHeader) BlockHashWithoutSignature() []byte {
+	// Encode the header and double sha256 everything prior to the number of
+	// transactions.  Ignore the error returns since there is no way the
+	// encode could fail except being out of memory which would cause a
+	// run-time panic.
+	buf := bytes.NewBuffer(make([]byte, 0, MaxBlockHeaderPayload-btcec.CompactSignatureSize))
+	_ = writeBlockHeaderWithoutSignature(buf, 0, h)
+
+	return chainhash.DoubleHashB(buf.Bytes())
+}
+
+// Sign signs the header data (except the signature itself)
+func (h *BlockHeader) Sign(key *btcec.PrivateKey) (*btcec.CompactSignature, error) {
+	hash := h.BlockHashWithoutSignature()
+
+	sigbytes, err := btcec.SignCompact(btcec.S256(), key, hash, true)
+	if err != nil {
+		return nil, err
+	}
+
+	copy(h.Signature[:], sigbytes)
+
+	return &h.Signature, nil
+}
+
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 // See Deserialize for decoding block headers stored to disk, such as in a
@@ -133,4 +159,12 @@ func writeBlockHeader(w io.Writer, pver uint32, bh *BlockHeader) error {
 	sec := uint32(bh.Timestamp.Unix())
 	return writeElements(w, bh.Version, &bh.PrevBlock, &bh.MerkleRoot,
 		sec, bh.Bits, bh.Nonce, &bh.Signature)
+}
+
+// writeBlockHeaderWithoutSignature does writeBlockHeader but without the
+// signature
+func writeBlockHeaderWithoutSignature(w io.Writer, pver uint32, bh *BlockHeader) error {
+	sec := uint32(bh.Timestamp.Unix())
+	return writeElements(w, bh.Version, &bh.PrevBlock, &bh.MerkleRoot,
+		sec, bh.Bits, bh.Nonce)
 }

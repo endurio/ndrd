@@ -5,11 +5,14 @@
 package blockchain
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"math"
 	"math/big"
 	"time"
+
+	"github.com/btcsuite/btcd/btcec"
 
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -58,6 +61,10 @@ var (
 	// set forth in BIP0030.  It is defined as a package level variable to
 	// avoid the need to create a new instance every time a check is needed.
 	block91880Hash = newHashFromStr("00000000000743f190a18c5577a3c2d2a1f610ae9601ac046a38084ccb7cd721")
+
+	authorities = [...][20]byte{
+		{0x2A, 0x27, 0xD3, 0x74, 0xA6, 0x66, 0x94, 0xFC, 0x8A, 0xCE, 0x9A, 0x0D, 0x73, 0xD0, 0xB9, 0x0E, 0xEC, 0x40, 0x42, 0x74},
+	}
 )
 
 // isNullOutpoint determines whether or not a previous transaction output point
@@ -433,11 +440,11 @@ func CountP2SHSigOps(tx *btcutil.Tx, isCoinBaseTx bool, utxoView *UtxoViewpoint)
 //
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkProofOfWork.
-func checkBlockHeaderSanity(header *wire.BlockHeader, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
+func checkBlockHeaderSanity(header *wire.BlockHeader, chainParams *chaincfg.Params, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	// Ensure the proof of work bits in the block header is in min/max range
 	// and the block hash is less than the target value described by the
 	// bits.
-	err := checkProofOfWork(header, powLimit, flags)
+	err := checkProofOfWork(header, chainParams.PowLimit, flags)
 	if err != nil {
 		return err
 	}
@@ -462,7 +469,34 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, powLimit *big.Int, timeSou
 		return ruleError(ErrTimeTooNew, str)
 	}
 
+	// no PoW nor signature check for block template
+	if flags&BFNoPoWCheck != BFNoPoWCheck {
+		// Recover the public key
+		pubkey, _, err := btcec.RecoverCompact(btcec.S256(), header.Signature[:], header.BlockHashWithoutSignature())
+		if err != nil {
+			str := fmt.Sprintf("unable to recover a valid key from block signature %v: %v", header.Signature, err)
+			return ruleError(ErrBadSignature, str)
+		}
+
+		serializedPK := pubkey.SerializeUncompressed()
+		pubKeyHash := btcutil.Hash160(serializedPK)
+
+		if !authorized(pubKeyHash) {
+			str := fmt.Sprintf("unauthorized miner with public key: %v", pubKeyHash)
+			return ruleError(ErrUnauthorizedMiner, str)
+		}
+	}
+
 	return nil
+}
+
+func authorized(pubKeyHash []byte) bool {
+	for _, authority := range authorities {
+		if bytes.Compare(pubKeyHash, authority[:]) == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // checkBlockSanity performs some preliminary checks on a block to ensure it is
@@ -470,10 +504,10 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, powLimit *big.Int, timeSou
 //
 // The flags do not modify the behavior of this function directly, however they
 // are needed to pass along to checkBlockHeaderSanity.
-func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource MedianTimeSource, flags BehaviorFlags) error {
+func checkBlockSanity(block *btcutil.Block, chainParams *chaincfg.Params, timeSource MedianTimeSource, flags BehaviorFlags) error {
 	msgBlock := block.MsgBlock()
 	header := &msgBlock.Header
-	err := checkBlockHeaderSanity(header, powLimit, timeSource, flags)
+	err := checkBlockHeaderSanity(header, chainParams, timeSource, flags)
 	if err != nil {
 		return err
 	}
@@ -577,8 +611,8 @@ func checkBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource Median
 
 // CheckBlockSanity performs some preliminary checks on a block to ensure it is
 // sane before continuing with block processing.  These checks are context free.
-func CheckBlockSanity(block *btcutil.Block, powLimit *big.Int, timeSource MedianTimeSource) error {
-	return checkBlockSanity(block, powLimit, timeSource, BFNone)
+func CheckBlockSanity(block *btcutil.Block, chainParams *chaincfg.Params, timeSource MedianTimeSource) error {
+	return checkBlockSanity(block, chainParams, timeSource, BFNone)
 }
 
 // ExtractCoinbaseHeight attempts to extract the height of the block from the
@@ -1255,7 +1289,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 // work requirement. The block must connect to the current tip of the main chain.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) CheckConnectBlockTemplate(block *btcutil.Block) error {
+func (b *BlockChain) CheckConnectBlockTemplate(block *btcutil.Block, chainParams *chaincfg.Params) error {
 	b.chainLock.Lock()
 	defer b.chainLock.Unlock()
 
@@ -1272,7 +1306,7 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *btcutil.Block) error {
 		return ruleError(ErrPrevBlockNotBest, str)
 	}
 
-	err := checkBlockSanity(block, b.chainParams.PowLimit, b.timeSource, flags)
+	err := checkBlockSanity(block, b.chainParams, b.timeSource, flags)
 	if err != nil {
 		return err
 	}

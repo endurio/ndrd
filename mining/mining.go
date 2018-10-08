@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
@@ -217,6 +218,17 @@ type BlockTemplate struct {
 	// witness has been activated, and the block contains a transaction
 	// which has witness data.
 	WitnessCommitment []byte
+}
+
+// Address returns the mining address for mining private key and chain params
+func Address(key *btcec.PrivateKey, chainParams *chaincfg.Params) btcutil.Address {
+	serializedPK := key.PubKey().SerializeCompressed()
+	address, err := btcutil.NewAddressPubKey(serializedPK, chainParams)
+	if err != nil {
+		// should not happen
+		return nil
+	}
+	return address.AddressPubKeyHash()
 }
 
 // mergeUtxoView adds all of the entries in viewB to viewA.  The result is that
@@ -875,7 +887,7 @@ mempoolLoop:
 	// chain with no issues.
 	block := btcutil.NewBlock(&msgBlock)
 	block.SetHeight(nextBlockHeight)
-	if err := g.chain.CheckConnectBlockTemplate(block); err != nil {
+	if err := g.chain.CheckConnectBlockTemplate(block, g.chainParams); err != nil {
 		return nil, err
 	}
 

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/connmgr"
@@ -145,7 +146,7 @@ type config struct {
 	TrickleInterval      time.Duration `long:"trickleinterval" description:"Minimum time between attempts to send new inventory to a connected peer"`
 	MaxOrphanTxs         int           `long:"maxorphantx" description:"Max number of orphan transactions to keep in memory"`
 	Generate             bool          `long:"generate" description:"Generate (mine) bitcoins using the CPU"`
-	MiningAddrs          []string      `long:"miningaddr" description:"Add the specified payment address to the list of addresses to use for generated blocks -- At least one address is required if the generate option is set"`
+	MiningKey            string        `long:"miningkey" description:"Add the specified payment private key to use for generated blocks -- It is required if the generate option is set"`
 	BlockMinSize         uint32        `long:"blockminsize" description:"Mininum block size in bytes to be used when creating a block"`
 	BlockMaxSize         uint32        `long:"blockmaxsize" description:"Maximum block size in bytes to be used when creating a block"`
 	BlockMinWeight       uint32        `long:"blockminweight" description:"Mininum block weight to be used when creating a block"`
@@ -167,7 +168,7 @@ type config struct {
 	oniondial            func(string, string, time.Duration) (net.Conn, error)
 	dial                 func(string, string, time.Duration) (net.Conn, error)
 	addCheckpoints       []chaincfg.Checkpoint
-	miningAddrs          []btcutil.Address
+	miningKey            *btcec.PrivateKey
 	minRelayTxFee        btcutil.Amount
 	whitelists           []*net.IPNet
 }
@@ -865,31 +866,25 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Check mining addresses are valid and saved parsed versions.
-	cfg.miningAddrs = make([]btcutil.Address, 0, len(cfg.MiningAddrs))
-	for _, strAddr := range cfg.MiningAddrs {
-		addr, err := btcutil.DecodeAddress(strAddr, activeNetParams.Params)
+	if len(cfg.MiningKey) > 0 {
+		// Encode the compressed byte points with base64.
+		decoded := make([]byte, base64.StdEncoding.DecodedLen(len(cfg.MiningKey)))
+		_, err := base64.StdEncoding.Decode(decoded, []byte(cfg.MiningKey))
 		if err != nil {
-			str := "%s: mining address '%s' failed to decode: %v"
-			err := fmt.Errorf(str, funcName, strAddr, err)
+			str := "%s: mining key '%s' failed to decode: %v"
+			err := fmt.Errorf(str, funcName, cfg.MiningKey, err)
 			fmt.Fprintln(os.Stderr, err)
 			fmt.Fprintln(os.Stderr, usageMessage)
 			return nil, nil, err
 		}
-		if !addr.IsForNet(activeNetParams.Params) {
-			str := "%s: mining address '%s' is on the wrong network"
-			err := fmt.Errorf(str, funcName, strAddr)
-			fmt.Fprintln(os.Stderr, err)
-			fmt.Fprintln(os.Stderr, usageMessage)
-			return nil, nil, err
-		}
-		cfg.miningAddrs = append(cfg.miningAddrs, addr)
+		cfg.miningKey, _ = btcec.PrivKeyFromBytes(btcec.S256(), decoded)
 	}
 
 	// Ensure there is at least one mining address when the generate flag is
 	// set.
-	if cfg.Generate && len(cfg.MiningAddrs) == 0 {
+	if cfg.Generate && cfg.miningKey == nil {
 		str := "%s: the generate flag is set, but there are no mining " +
-			"addresses specified "
+			"key specified "
 		err := fmt.Errorf(str, funcName)
 		fmt.Fprintln(os.Stderr, err)
 		fmt.Fprintln(os.Stderr, usageMessage)

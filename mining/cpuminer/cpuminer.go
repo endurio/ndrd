@@ -7,12 +7,12 @@ package cpuminer
 import (
 	"errors"
 	"fmt"
-	"math/rand"
 	"runtime"
 	"sync"
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/mining"
@@ -57,9 +57,8 @@ type Config struct {
 	// generate block templates that the miner will attempt to solve.
 	BlockTemplateGenerator *mining.BlkTmplGenerator
 
-	// MiningAddrs is a list of payment addresses to use for the generated
-	// blocks.  Each generated block will randomly choose one of them.
-	MiningAddrs []btcutil.Address
+	// MiningKey is the private key to use for the generated blocks.
+	MiningKey *btcec.PrivateKey
 
 	// ProcessBlock defines the function to call with any solved blocks.
 	// It typically must run the provided block through the same set of
@@ -274,6 +273,7 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 			// increment the number of hashes completed for each
 			// attempt accordingly.
 			header.Nonce = i
+			header.Sign(m.cfg.MiningKey)
 			hash := header.BlockHash()
 			hashesCompleted += 2
 
@@ -334,9 +334,7 @@ out:
 			continue
 		}
 
-		// Choose a payment address at random.
-		rand.Seed(time.Now().UnixNano())
-		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
+		payToAddr := mining.Address(m.cfg.MiningKey, m.cfg.ChainParams)
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
@@ -588,9 +586,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		m.submitBlockLock.Lock()
 		curHeight := m.g.BestSnapshot().Height
 
-		// Choose a payment address at random.
-		rand.Seed(time.Now().UnixNano())
-		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
+		payToAddr := mining.Address(m.cfg.MiningKey, m.cfg.ChainParams)
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially

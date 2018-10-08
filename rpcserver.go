@@ -880,11 +880,10 @@ func handleEstimateFee(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 func handleGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	// Respond with an error if there are no addresses to pay the
 	// created blocks to.
-	if len(cfg.miningAddrs) == 0 {
+	if cfg.miningKey == nil {
 		return nil, &btcjson.RPCError{
-			Code: btcjson.ErrRPCInternal.Code,
-			Message: "No payment addresses specified " +
-				"via --miningaddr",
+			Code:    btcjson.ErrRPCInternal.Code,
+			Message: "No payment key specified via --miningkey",
 		}
 	}
 
@@ -1562,7 +1561,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// to create their own coinbase.
 		var payAddr btcutil.Address
 		if !useCoinbaseValue {
-			payAddr = cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
+			payAddr = mining.Address(cfg.miningKey, s.cfg.ChainParams)
 		}
 
 		// Create a new block template that has a coinbase which anyone
@@ -1617,7 +1616,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// returned if none have been specified.
 		if !useCoinbaseValue && !template.ValidPayAddress {
 			// Choose a payment address at random.
-			payToAddr := cfg.miningAddrs[rand.Intn(len(cfg.miningAddrs))]
+			payToAddr := mining.Address(cfg.miningKey, s.cfg.ChainParams)
 
 			// Update the block coinbase output of the template to
 			// pay to the randomly selected payment address.
@@ -1773,7 +1772,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 				Message: "A coinbase transaction has been " +
 					"requested, but the server has not " +
 					"been configured with any payment " +
-					"addresses via --miningaddr",
+					"key via --miningkey",
 			}
 		}
 
@@ -1925,12 +1924,12 @@ func handleGetBlockTemplateRequest(s *rpcServer, request *btcjson.TemplateReques
 
 	// When a coinbase transaction has been requested, respond with an error
 	// if there are no addresses to pay the created block template to.
-	if !useCoinbaseValue && len(cfg.miningAddrs) == 0 {
+	if !useCoinbaseValue && cfg.miningKey == nil {
 		return nil, &btcjson.RPCError{
 			Code: btcjson.ErrRPCInternal.Code,
 			Message: "A coinbase transaction has been requested, " +
 				"but the server has not been configured with " +
-				"any payment addresses via --miningaddr",
+				"any payment key via --miningkey",
 		}
 	}
 
@@ -2127,7 +2126,7 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *btcjson.TemplateReque
 		return "bad-prevblk", nil
 	}
 
-	if err := s.cfg.Chain.CheckConnectBlockTemplate(block); err != nil {
+	if err := s.cfg.Chain.CheckConnectBlockTemplate(block, s.cfg.ChainParams); err != nil {
 		if _, ok := err.(blockchain.RuleError); !ok {
 			errStr := fmt.Sprintf("Failed to process block proposal: %v", err)
 			rpcsLog.Error(errStr)
@@ -3394,11 +3393,10 @@ func handleSetGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	} else {
 		// Respond with an error if there are no addresses to pay the
 		// created blocks to.
-		if len(cfg.miningAddrs) == 0 {
+		if cfg.miningKey == nil {
 			return nil, &btcjson.RPCError{
-				Code: btcjson.ErrRPCInternal.Code,
-				Message: "No payment addresses specified " +
-					"via --miningaddr",
+				Code:    btcjson.ErrRPCInternal.Code,
+				Message: "No payment key specified via --miningkey",
 			}
 		}
 
@@ -3494,7 +3492,7 @@ func verifyChain(s *rpcServer, level, depth int32) error {
 		// Level 1 does basic chain sanity checks.
 		if level > 0 {
 			err := blockchain.CheckBlockSanity(block,
-				s.cfg.ChainParams.PowLimit, s.cfg.TimeSource)
+				s.cfg.ChainParams, s.cfg.TimeSource)
 			if err != nil {
 				rpcsLog.Errorf("Verify is unable to validate "+
 					"block at hash %v height %d: %v",
