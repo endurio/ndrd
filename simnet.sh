@@ -49,7 +49,7 @@ CTLW="$CTL --wallet"
 BTCW="btcwallet --simnet --connect=localhost --username=a --password=a --createtemp"
 
 if [[ $daemon -ne 0 ]]; then
-	start btcd --simnet --rpcuser=a --rpcpass=a --miningaddr=$MINING_ADDR
+	start btcd --simnet --rpcuser=a --rpcpass=a --miningkey=$MINING_SKEY
 
 	if [[ $first -ne 0 ]]; then
 		sleep 2

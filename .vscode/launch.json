@@ -14,7 +14,7 @@
             "host": "127.0.0.1",
             "program": "${workspaceFolder}",
             "env": {},
-            "args": ["--simnet", "--rpcuser=a", "--rpcpass=a", "--miningaddr=SUkMuEFAq5MgzrdFghNF6LB9N5W8e74Q81"],
+            "args": ["--simnet", "--rpcuser=a", "--rpcpass=a", "--miningkey=FudTNM3XSmTHzxHVkHHXHGAidcaYACK2hKiVLtZAmsuELsf7xShq"],
             "showLog": false
         }
     ]
