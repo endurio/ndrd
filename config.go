@@ -867,17 +867,11 @@ func loadConfig() (*config, []string, error) {
 
 	// Check mining addresses are valid and saved parsed versions.
 	if len(cfg.MiningKey) > 0 {
-		// Encode the compressed byte points with base64.
-		decoded := make([]byte, base64.StdEncoding.DecodedLen(len(cfg.MiningKey)))
-		_, err := base64.StdEncoding.Decode(decoded, []byte(cfg.MiningKey))
+		privWif, err := btcutil.DecodeWIF(cfg.MiningKey)
 		if err != nil {
-			str := "%s: mining key '%s' failed to decode: %v"
-			err := fmt.Errorf(str, funcName, cfg.MiningKey, err)
-			fmt.Fprintln(os.Stderr, err)
-			fmt.Fprintln(os.Stderr, usageMessage)
 			return nil, nil, err
 		}
-		cfg.miningKey, _ = btcec.PrivKeyFromBytes(btcec.S256(), decoded)
+		cfg.miningKey = privWif.PrivKey
 	}
 
 	// Ensure there is at least one mining address when the generate flag is
