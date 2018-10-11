@@ -280,8 +280,8 @@ var MainNetParams = Params{
 	Bech32HRPSegwit: "bc", // always bc for main net
 
 	// Address encoding magics
-	PubKeyHashAddrID:        0x3D, // starts with A2-AA
-	ScriptHashAddrID:        0xA9, // starts with S1-S9
+	PubKeyHashAddrID:        0x17, // starts with A
+	ScriptHashAddrID:        0x3F, // starts with S
 	PrivateKeyID:            0x26, // starts with 2H-2J (uncompressed) or 6d-6m (compressed)
 	WitnessPubKeyHashAddrID: 0x06, // starts with p2
 	WitnessScriptHashAddrID: 0x0A, // starts with 7Xh
