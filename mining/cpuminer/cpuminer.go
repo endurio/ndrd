@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"runtime"
 	"sync"
 	"time"
 
@@ -42,10 +41,8 @@ const (
 )
 
 var (
-	// defaultNumWorkers is the default number of workers to use for mining
-	// and is based on the number of processor cores.  This helps ensure the
-	// system stays reasonably responsive under heavy load.
-	defaultNumWorkers = uint32(runtime.NumCPU())
+	// defaultNumWorkers is always 1 for MVP
+	defaultNumWorkers = uint32(1)
 )
 
 // Config is a descriptor containing the cpu miner configuration.
