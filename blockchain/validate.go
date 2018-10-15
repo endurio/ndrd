@@ -43,7 +43,7 @@ const (
 
 	// baseSubsidy is the starting subsidy amount for mined blocks.  This
 	// value is halved every SubsidyHalvingInterval blocks.
-	baseSubsidy = 50 * btcutil.SatoshiPerBitcoin
+	baseSubsidy = 0 * btcutil.SatoshiPerBitcoin
 )
 
 var (
