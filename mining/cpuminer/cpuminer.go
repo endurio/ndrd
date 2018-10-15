@@ -7,6 +7,7 @@ package cpuminer
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"runtime"
 	"sync"
 	"time"
@@ -217,7 +218,10 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 
 	// Create some convenience variables.
 	header := &msgBlock.Header
-	targetDifficulty := blockchain.CompactToBig(header.Bits)
+
+	// seed the pseudo random
+	rand.Seed(time.Now().UnixNano())
+	targetBlockTime := int64(m.cfg.ChainParams.TargetTimePerBlock)
 
 	// Initial state.
 	lastGenerated := time.Now()
@@ -273,14 +277,16 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 			// increment the number of hashes completed for each
 			// attempt accordingly.
 			header.Nonce = i
-			header.Sign(m.cfg.MiningKey)
-			hash := header.BlockHash()
+			// Randomly sleep and check
+			dividend := rand.Int63n(13) + 6
+			delay := targetBlockTime / dividend
+			time.Sleep(time.Duration(delay))
 			hashesCompleted += 2
 
-			// The block is solved when the new block hash is less
-			// than the target difficulty.  Yay!
-			if blockchain.HashToBig(&hash).Cmp(targetDifficulty) <= 0 {
+			// Yay!
+			if rand.Int63n(dividend) == 0 {
 				m.updateHashes <- hashesCompleted
+				header.Sign(m.cfg.MiningKey)
 				return true
 			}
 		}
