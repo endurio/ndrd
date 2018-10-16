@@ -78,6 +78,9 @@ type Config struct {
 	// not current since any solved blocks would be on a side chain and and
 	// up orphaned anyways.
 	IsCurrent func() bool
+
+	// SingleNode allows mainnet and testnet to run in with only 1 node.
+	SingleNode bool
 }
 
 // CPUMiner provides facilities for solving blocks (mining) using the CPU in
@@ -319,7 +322,8 @@ out:
 		// Wait until there is a connection to at least one other peer
 		// since there is no way to relay a found block or receive
 		// transactions to work on when there are no connected peers.
-		if m.cfg.ConnectedCount() == 0 {
+		// Unless we are in single node mode
+		if !m.cfg.SingleNode && m.cfg.ConnectedCount() == 0 {
 			time.Sleep(time.Second)
 			continue
 		}

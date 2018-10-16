@@ -133,6 +133,7 @@ type config struct {
 	TestNet3             bool          `long:"testnet" description:"Use the test network"`
 	RegressionTest       bool          `long:"regtest" description:"Use the regression test network"`
 	SimNet               bool          `long:"simnet" description:"Use the simulation test network"`
+	SingleNode           bool          `long:"singlenode" description:"Allow mainnet and testnet to run with only a single node"`
 	AddCheckpoints       []string      `long:"addcheckpoint" description:"Add a custom checkpoint.  Format: '<height>:<hash>'"`
 	DisableCheckpoints   bool          `long:"nocheckpoints" description:"Disable built-in checkpoints.  Don't do this unless you know what you're doing."`
 	DbType               string        `long:"dbtype" description:"Database backend to use for the Block Chain"`

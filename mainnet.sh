@@ -47,7 +47,7 @@ BTCW="btcwallet --connect=localhost --username=a --password=a --create --walletp
 if [[ $daemon -ne 0 ]]; then
 	# addresses and keys
 	MINING_SKEY=`gpg -d ~/keys/a.gpg`
-	start btcd --debuglevel=trace --rpcuser=a --rpcpass=a --generate --miningkey=$MINING_SKEY
+	start btcd --singlenode --debuglevel=trace --rpcuser=a --rpcpass=a --generate --miningkey=$MINING_SKEY
 fi
 
 if [[ $wallet -ne 0 ]]; then

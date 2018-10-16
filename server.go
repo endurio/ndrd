@@ -2735,6 +2735,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		ProcessBlock:           s.syncManager.ProcessBlock,
 		ConnectedCount:         s.ConnectedCount,
 		IsCurrent:              s.syncManager.IsCurrent,
+		SingleNode:             cfg.SingleNode,
 	})
 
 	// Only setup a function to return new addresses to connect to when
@@ -2743,8 +2744,9 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	// specified peers and actively avoid advertising and connecting to
 	// discovered peers in order to prevent it from becoming a public test
 	// network.
+	// Unless we are in single node mode.
 	var newAddressFunc func() (net.Addr, error)
-	if !cfg.SimNet && len(cfg.ConnectPeers) == 0 {
+	if !cfg.SingleNode && !cfg.SimNet && len(cfg.ConnectPeers) == 0 {
 		newAddressFunc = func() (net.Addr, error) {
 			for tries := 0; tries < 100; tries++ {
 				addr := s.addrManager.GetAddress()
