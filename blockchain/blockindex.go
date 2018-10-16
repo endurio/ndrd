@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
@@ -99,6 +100,8 @@ type blockNode struct {
 	// only be accessed using the concurrent-safe NodeStatus method on
 	// blockIndex once the node has been added to the global index.
 	status blockStatus
+
+	signature btcec.CompactSignature
 }
 
 // initBlockNode initializes a block node from the given header and parent node,
@@ -114,6 +117,7 @@ func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *block
 		nonce:      blockHeader.Nonce,
 		timestamp:  blockHeader.Timestamp.Unix(),
 		merkleRoot: blockHeader.MerkleRoot,
+		signature:  blockHeader.Signature,
 	}
 	if parent != nil {
 		node.parent = parent
@@ -147,6 +151,7 @@ func (node *blockNode) Header() wire.BlockHeader {
 		Timestamp:  time.Unix(node.timestamp, 0),
 		Bits:       node.bits,
 		Nonce:      node.nonce,
+		Signature:  node.signature,
 	}
 }
 
