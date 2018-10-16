@@ -236,7 +236,7 @@ var MainNetParams = Params{
 	BIP0034Height:            0, // Always active on Endurio
 	BIP0065Height:            0, // Always active on Endurio
 	BIP0066Height:            0, // Always active on Endurio
-	CoinbaseMaturity:         100,
+	CoinbaseMaturity:         0,
 	SubsidyReductionInterval: 210000,
 	TargetTimespan:           time.Hour * 24 * 7,             // 7 days
 	TargetTimePerBlock:       time.Hour * 24 * 7 / 1024 / 16, // Block time
