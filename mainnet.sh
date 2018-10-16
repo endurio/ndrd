@@ -32,27 +32,43 @@ shift $((OPTIND-1))
 
 [ "${1:-}" = "--" ] && shift
 
-# process OPTs
-if [[ $remove -ne 0 ]]; then
-	rm -rf "$LOCALAPPDATA/btcd/data/mainnet"
-	rm -rf "$LOCALAPPDATA/btcwallet/mainnet"
-fi
-rm -rf "$LOCALAPPDATA/btcwalletTMP/mainnet"
-
 CTL="btcctl --rpcuser=a --rpcpass=a --skipverify"
 CTLW="$CTL --wallet"
 
-BTCW="btcwallet --connect=localhost --username=a --password=a --create --walletpass=password"
+BTCD="btcd --singlenode --debuglevel=trace --rpcuser=a --rpcpass=a --generate"
+BTCW="btcwallet --connect=localhost --username=a --password=a"
 
 if [[ $daemon -ne 0 ]]; then
-	# addresses and keys
-	MINING_SKEY=`gpg -d ~/keys/a.gpg`
-	start btcd --singlenode --debuglevel=trace --rpcuser=a --rpcpass=a --generate --miningkey=$MINING_SKEY
+	if [[ $remove -ne 0 ]]; then
+		rm -rf "$LOCALAPPDATA/btcd/data/mainnet"
+	fi
+	start $BTCD --miningkey=`gpg -d ~/keys/a.gpg`
+
+	if [[ $first -ne 0 ]]; then
+		sleep 10
+		rm -rf "$LOCALAPPDATA/btcwallet/mainnet"
+		winpty $BTCW --create
+		start $BTCW
+		sleep 5
+		WALLET_ADDR=`$CTLW getnewaddress`
+		taskkill -F -IM btcwallet.exe
+
+		rm -rf "$LOCALAPPDATA/btcwalletTMP/mainnet"
+		winpty $BTCW --appdata="$LOCALAPPDATA/btcwalletTMP" --create
+		start $BTCW --appdata="$LOCALAPPDATA/btcwalletTMP"
+		sleep 5
+		$CTLW walletpassphrase 0 0
+		$CTLW importprivkey `gpg -d ~/keys/ndr.gpg`
+		$CTLW sendfrom imported $WALLET_ADDR 4 NDR
+		$CTLW importprivkey `gpg -d ~/keys/stb.gpg`
+		$CTLW sendfrom imported $WALLET_ADDR 6 STB
+		taskkill -F -IM btcwallet.exe
+	fi
 fi
 
 if [[ $wallet -ne 0 ]]; then
 	sleep 2
-	start $BTCW --appdata="$LOCALAPPDATA/btcwallet"
+	start $BTCW
 	sleep 5
-	$CTLW walletpassphrase "password" 0
+	$CTLW walletpassphrase 0 0
 fi
