@@ -12,7 +12,7 @@ debug=0
 while getopts "h?frdw" opt; do
     case "$opt" in
     h|\?)
-        echo "$(basename ""$0"") [-h] [-?] [-f|-r] -d"
+        echo "$(basename ""$0"") [-h] [-?] [-f|-r] [-d]"
         exit 0
         ;;
 	r)	remove=1
@@ -21,6 +21,7 @@ while getopts "h?frdw" opt; do
 		remove=1
 		;;
 	d)	debug=1
+		;;
     esac
 done
 
