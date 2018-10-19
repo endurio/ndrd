@@ -35,6 +35,6 @@ if [[ $debug -ne 0 ]]; then
 fi
 
 if [[ $remove -ne 0 ]]; then
-	rm -rf "~/.btcd/data/mainnet"
+	rm -rf ~/.btcd/data/mainnet
 fi
 $BTCD --miningkey=`gpg -d ~/keys/a.gpg`
