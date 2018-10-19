@@ -29,7 +29,7 @@ shift $((OPTIND-1))
 
 [ "${1:-}" = "--" ] && shift
 
-BTCD="btcd --singlenode --generate --rpcuser=a --rpcpass=a --notls --rpclisten=:8334"
+BTCD="btcd --singlenode --generate"
 if [[ $debug -ne 0 ]]; then
 	BTCD=$BTCD --debuglevel=trace
 fi
