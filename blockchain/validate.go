@@ -61,10 +61,6 @@ var (
 	// set forth in BIP0030.  It is defined as a package level variable to
 	// avoid the need to create a new instance every time a check is needed.
 	block91880Hash = newHashFromStr("00000000000743f190a18c5577a3c2d2a1f610ae9601ac046a38084ccb7cd721")
-
-	authorities = [...][20]byte{
-		{0xEC, 0xCA, 0xD9, 0xB4, 0x1F, 0x2B, 0xC2, 0x40, 0x70, 0xF9, 0xDE, 0xC1, 0x7F, 0xD9, 0xAC, 0x0B, 0x0D, 0x1D, 0xBC, 0xE9},
-	}
 )
 
 // isNullOutpoint determines whether or not a previous transaction output point
@@ -454,7 +450,7 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, chainParams *chaincfg.Para
 		serializedPK := pubkey.SerializeCompressed()
 		pubKeyHash := btcutil.Hash160(serializedPK)
 
-		if !authorized(pubKeyHash) {
+		if !authorized(pubKeyHash, chainParams) {
 			str := fmt.Sprintf("unauthorized miner with public key: %v", pubKeyHash)
 			return ruleError(ErrUnauthorizedMiner, str)
 		}
@@ -463,9 +459,9 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, chainParams *chaincfg.Para
 	return nil
 }
 
-func authorized(pubKeyHash []byte) bool {
-	for _, authority := range authorities {
-		if bytes.Compare(pubKeyHash, authority[:]) == 0 {
+func authorized(pubKeyHash []byte, chainParams *chaincfg.Params) bool {
+	for _, pkh := range chainParams.AuthorizedPKHs {
+		if bytes.Compare(pubKeyHash, pkh[:]) == 0 {
 			return true
 		}
 	}

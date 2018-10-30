@@ -219,6 +219,9 @@ type Params struct {
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
 	HDCoinType uint32
+
+	// Authorized PKHs for MVP miners
+	AuthorizedPKHs [][20]byte
 }
 
 // MainNetParams defines the network parameters for the main Bitcoin network.
@@ -293,6 +296,11 @@ var MainNetParams = Params{
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
 	HDCoinType: 0,
+
+	// Authorized PKHs for MVP miners
+	AuthorizedPKHs: [][20]byte{
+		{0x3C, 0xAF, 0xBA, 0x5A, 0x29, 0x37, 0xFC, 0xAB, 0x81, 0x8F, 0x4D, 0xBF, 0xDB, 0x81, 0xFA, 0x48, 0x0C, 0x97, 0x25, 0x6D},
+	},
 }
 
 // RegressionNetParams defines the network parameters for the regression test
@@ -523,6 +531,11 @@ var SimNetParams = Params{
 	// BIP44 coin type used in the hierarchical deterministic path for
 	// address generation.
 	HDCoinType: 115, // ASCII for s
+
+	// Authorized PKHs for MVP miners
+	AuthorizedPKHs: [][20]byte{
+		{0xEC, 0xCA, 0xD9, 0xB4, 0x1F, 0x2B, 0xC2, 0x40, 0x70, 0xF9, 0xDE, 0xC1, 0x7F, 0xD9, 0xAC, 0x0B, 0x0D, 0x1D, 0xBC, 0xE9},
+	},
 }
 
 var (
