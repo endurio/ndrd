@@ -14,7 +14,7 @@
             "host": "127.0.0.1",
             "program": "${workspaceFolder}",
             "env": {},
-            "args": ["--singlenode", "--rpcuser=a", "--rpcpass=a", "--debuglevel=trace", "--generate", "--miningkey="],
+            "args": ["--simnet", "--rpcuser=a", "--rpcpass=a", "--miningkey=Fw28Hpjon65S4XT8uyfh7w7UFxWVExTs8oDyQZXwB1fTgwwzxnVY"],
             "showLog": false
         }
     ]
