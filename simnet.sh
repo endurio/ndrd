@@ -52,9 +52,6 @@ if [[ $daemon -ne 0 ]]; then
 	start btcd --simnet --rpcuser=a --rpcpass=a --miningkey=$MINING_SKEY
 
 	if [[ $first -ne 0 ]]; then
-		sleep 2
-		$CTL generate 1024
-
 		start $BTCW --appdata="$LOCALAPPDATA/btcwallet"
 		sleep 5
 		WALLET_ADDR=`$CTLW getnewaddress`
