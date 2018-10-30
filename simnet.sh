@@ -43,7 +43,7 @@ if [[ $remove -ne 0 ]]; then
 fi
 rm -rf "$LOCALAPPDATA/btcwalletTMP/simnet"
 
-CTL="btcctl --simnet --rpcuser=a --rpcpass=a --skipverify"
+CTL="ndrctl --simnet --rpcuser=a --rpcpass=a --skipverify"
 CTLW="$CTL --wallet"
 
 BTCW="btcwallet --simnet --connect=localhost --username=a --password=a --createtemp"
