@@ -510,7 +510,7 @@ var SimNetParams = Params{
 	Bech32HRPSegwit: "sb", // always sb for sim net
 
 	// Address encoding magics
-	PubKeyHashAddrID:        0x3f, // starts with S
+	PubKeyHashAddrID:        0x53, // starts with a
 	ScriptHashAddrID:        0x7b, // starts with s
 	PrivateKeyID:            0x64, // starts with 4 (uncompressed) or F (compressed)
 	WitnessPubKeyHashAddrID: 0x19, // starts with Gg
