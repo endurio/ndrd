@@ -219,6 +219,13 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 	// Create some convenience variables.
 	header := &msgBlock.Header
 
+	// instant generation for simnet
+	if m.cfg.ChainParams.Net == wire.SimNet {
+		header.Nonce = uint32(enOffset)
+		header.Sign(m.cfg.MiningKey)
+		return true
+	}
+
 	// seed the pseudo random
 	rand.Seed(time.Now().UnixNano())
 	targetBlockTime := int64(m.cfg.ChainParams.TargetTimePerBlock)
@@ -277,6 +284,7 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 			// increment the number of hashes completed for each
 			// attempt accordingly.
 			header.Nonce = i
+
 			// Randomly sleep and check
 			dividend := rand.Int63n(13) + 6
 			delay := targetBlockTime / dividend
