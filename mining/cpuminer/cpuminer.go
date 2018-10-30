@@ -219,8 +219,8 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 	// Create some convenience variables.
 	header := &msgBlock.Header
 
-	// instant generation for simnet
-	if m.cfg.ChainParams.Net == wire.SimNet {
+	// instant generation when generate is supported (simnet and regnet)
+	if m.cfg.ChainParams.GenerateSupported {
 		header.Nonce = uint32(enOffset)
 		header.Sign(m.cfg.MiningKey)
 		return true
