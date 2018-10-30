@@ -33,8 +33,8 @@ shift $((OPTIND-1))
 [ "${1:-}" = "--" ] && shift
 
 # addresses and keys
-MINING_ADDR=SSwMMZKdfuK7oPjhEGuzVPtGVuGQfaG6Tb
-MINING_SKEY=FudTNM3XSmTHzxHVkHHXHGAidcaYACK2hKiVLtZAmsuELsf7xShq
+MINING_ADDR=ame7CaXCbBV4YvpLUX3fNsGSd7y3ryBfKf
+MINING_SKEY=Fw28Hpjon65S4XT8uyfh7w7UFxWVExTs8oDyQZXwB1fTgwwzxnVY
 
 # process OPTs
 if [[ $remove -ne 0 ]]; then
