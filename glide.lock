@@ -1,12 +1,13 @@
-hash: 4d4efdd452d746ef15b66d35caadb3cbd58bb299e9c1f5172e90b2f3f272863f
-updated: 2018-10-19T17:48:24.9217316+07:00
+hash: 438a280098633aad2e8c0bdbc0b5739f26d3b18bbbe7c0ebc1f9bea0d9eda45e
+updated: 2018-11-12T13:40:13.5783306+07:00
 imports:
 - name: github.com/aead/siphash
   version: 83563a290f60225eb120d724600b9690c3fb536f
 - name: github.com/btcsuite/btclog
   version: 84c8d2346e9fc8c7b947e243b9c24e6df9fd206a
 - name: github.com/btcsuite/btcutil
-  version: ab6388e0c60ae4834a1f57511e20c17b5f78be4b
+  version: 597e522a814da0dd394c64fddf4eb73d8a59f95a
+  repo: github.com/Zergity/btcutil
   subpackages:
   - base58
   - bech32
