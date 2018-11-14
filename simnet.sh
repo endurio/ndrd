@@ -9,11 +9,12 @@ remove=0
 daemon=1
 wallet=1
 first=0
+trace=0
 
-while getopts "h?frdw" opt; do
+while getopts "h?frdwt" opt; do
     case "$opt" in
     h|\?)
-        echo "$(basename ""$0"") [-h] [-?] [-f|-r] [-d|-w] nodes_count"
+        echo "$(basename ""$0"") [-h] [-?] [-f|-r] [-d|-w] [-t] nodes_count"
         exit 0
         ;;
 	r)	remove=1
@@ -24,6 +25,8 @@ while getopts "h?frdw" opt; do
 	d)	wallet=0
 		;;
 	w)	daemon=0
+		;;
+	t)	trace=1
 		;;
     esac
 done
@@ -39,17 +42,26 @@ MINING_SKEY=Fw28Hpjon65S4XT8uyfh7w7UFxWVExTs8oDyQZXwB1fTgwwzxnVY
 # process OPTs
 if [[ $remove -ne 0 ]]; then
 	rm -rf "$LOCALAPPDATA/btcd/data/simnet"
+	rm -rf "$LOCALAPPDATA/btcd/logs/simnet"
 	rm -rf "$LOCALAPPDATA/btcwallet/simnet"
+	rm -rf "$LOCALAPPDATA/btcwallet/logs/simnet"
 fi
 rm -rf "$LOCALAPPDATA/btcwalletTMP/simnet"
+rm -rf "$LOCALAPPDATA/btcwalletTMP/logs/simnet"
 
 CTL="ndrctl --simnet --rpcuser=a --rpcpass=a --skipverify"
 CTLW="$CTL --wallet"
 
+BTCD="btcd --simnet --rpcuser=a --rpcpass=a --miningkey=$MINING_SKEY"
 BTCW="btcwallet --simnet --connect=localhost --username=a --password=a --createtemp"
 
+if [[ $trace -ne 0 ]]; then
+	BTCD="$BTCD --debuglevel=trace"
+	BTCW="$BTCW --debuglevel=trace"
+fi
+
 if [[ $daemon -ne 0 ]]; then
-	start btcd --simnet --rpcuser=a --rpcpass=a --miningkey=$MINING_SKEY
+	start $BTCD
 
 	if [[ $first -ne 0 ]]; then
 		start $BTCW --appdata="$LOCALAPPDATA/btcwallet"
