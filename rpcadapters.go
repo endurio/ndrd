@@ -223,6 +223,12 @@ func (cm *rpcConnManager) RelayTransactions(txns []*mempool.TxDesc) {
 	cm.server.relayTransactions(txns)
 }
 
+// RelayOrders generates and relays inventory vectors for all of the
+// passed orders to all connected peers.
+func (cm *rpcConnManager) RelayOrders(orders []*mempool.OdrDesc) {
+	cm.server.relayOrders(orders)
+}
+
 // rpcSyncMgr provides a block manager for use with the RPC server and
 // implements the rpcserverSyncManager interface.
 type rpcSyncMgr struct {

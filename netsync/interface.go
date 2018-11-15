@@ -20,11 +20,15 @@ import (
 type PeerNotifier interface {
 	AnnounceNewTransactions(newTxs []*mempool.TxDesc)
 
+	AnnounceNewOrders(newOrders []*mempool.OdrDesc)
+
 	UpdatePeerHeights(latestBlkHash *chainhash.Hash, latestHeight int32, updateSource *peer.Peer)
 
 	RelayInventory(invVect *wire.InvVect, data interface{})
 
 	TransactionConfirmed(tx *btcutil.Tx)
+
+	OrderFilled(odr *btcutil.Odr)
 }
 
 // Config is a configuration struct used to initialize a new SyncManager.
@@ -32,6 +36,7 @@ type Config struct {
 	PeerNotifier PeerNotifier
 	Chain        *blockchain.BlockChain
 	TxMemPool    *mempool.TxPool
+	OdrMemBook   *mempool.OdrBook
 	ChainParams  *chaincfg.Params
 
 	DisableCheckpoints bool

@@ -550,6 +550,46 @@ func NewSendToAddressCmd(address string, amount float64, token, comment, comment
 	}
 }
 
+// BidCmd defines the bid JSON-RPC command.
+type BidCmd struct {
+	Amount  float64 // In BTC
+	Price   float64
+	MinConf *int `jsonrpcdefault:"1"`
+}
+
+// NewBidCmd returns a new instance which can be used to issue a bid
+// JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewBidCmd(amount, price float64, minConf *int) *BidCmd {
+	return &BidCmd{
+		Amount:  amount,
+		Price:   price,
+		MinConf: minConf,
+	}
+}
+
+// AskCmd defines the bid JSON-RPC command.
+type AskCmd struct {
+	Amount  float64 // In NDR
+	Price   float64
+	MinConf *int `jsonrpcdefault:"1"`
+}
+
+// NewAskCmd returns a new instance which can be used to issue a bid
+// JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewAskCmd(amount, price float64, minConf *int) *AskCmd {
+	return &AskCmd{
+		Amount:  amount, // In NDR
+		Price:   price,
+		MinConf: minConf,
+	}
+}
+
 // SetAccountCmd defines the setaccount JSON-RPC command.
 type SetAccountCmd struct {
 	Address string
@@ -699,6 +739,8 @@ func init() {
 	MustRegisterCmd("sendfrom", (*SendFromCmd)(nil), flags)
 	MustRegisterCmd("sendmany", (*SendManyCmd)(nil), flags)
 	MustRegisterCmd("sendtoaddress", (*SendToAddressCmd)(nil), flags)
+	MustRegisterCmd("bid", (*BidCmd)(nil), flags)
+	MustRegisterCmd("ask", (*AskCmd)(nil), flags)
 	MustRegisterCmd("setaccount", (*SetAccountCmd)(nil), flags)
 	MustRegisterCmd("settxfee", (*SetTxFeeCmd)(nil), flags)
 	MustRegisterCmd("signmessage", (*SignMessageCmd)(nil), flags)

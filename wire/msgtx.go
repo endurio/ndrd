@@ -301,9 +301,23 @@ func StripTokenID(pkScript []byte) []byte {
 	return pkScript
 }
 
+// SwapToken ...
+func SwapToken(pkScript []byte) []byte {
+	scriptLen := len(pkScript)
+	if scriptLen > 0 && pkScript[scriptLen-1] == OP_NDR {
+		return pkScript[:scriptLen-1]
+	}
+	return append(pkScript, OP_NDR)
+}
+
 // TokenID returns the token identity recorded in the TxOut
 func (t *TxOut) TokenID() TokenIdentity {
 	return TokenID(t.PkScript)
+}
+
+// SwapToken ...
+func (t *TxOut) SwapToken() {
+	t.PkScript = SwapToken(t.PkScript)
 }
 
 // SerializeSize returns the number of bytes it would take to serialize the

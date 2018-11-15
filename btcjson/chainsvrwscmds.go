@@ -57,6 +57,22 @@ func NewNotifyNewTransactionsCmd(verbose *bool) *NotifyNewTransactionsCmd {
 	}
 }
 
+// NotifyNewOrdersCmd defines the notifyneworders JSON-RPC command.
+type NotifyNewOrdersCmd struct {
+	Verbose *bool `jsonrpcdefault:"false"`
+}
+
+// NewNotifyNewOrdersCmd returns a new instance which can be used to issue
+// a notifyneworders JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewNotifyNewOrdersCmd(verbose *bool) *NotifyNewOrdersCmd {
+	return &NotifyNewOrdersCmd{
+		Verbose: verbose,
+	}
+}
+
 // SessionCmd defines the session JSON-RPC command.
 type SessionCmd struct{}
 

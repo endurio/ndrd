@@ -159,12 +159,15 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getpeerinfo":           handleGetPeerInfo,
 	"getrawmempool":         handleGetRawMempool,
 	"getrawtransaction":     handleGetRawTransaction,
+	"getrawmembook":         handleGetRawMembook,
+	"getraworder":           handleGetRawOrder,
 	"gettxout":              handleGetTxOut,
 	"help":                  handleHelp,
 	"node":                  handleNode,
 	"ping":                  handlePing,
 	"searchrawtransactions": handleSearchRawTransactions,
 	"sendrawtransaction":    handleSendRawTransaction,
+	"sendraworder":          handleSendRawOrder,
 	"setgenerate":           handleSetGenerate,
 	"stop":                  handleStop,
 	"submitblock":           handleSubmitBlock,
@@ -274,6 +277,7 @@ var rpcLimited = map[string]struct{}{
 	"gettxout":              {},
 	"searchrawtransactions": {},
 	"sendrawtransaction":    {},
+	"sendraworder":          {},
 	"submitblock":           {},
 	"uptime":                {},
 	"validateaddress":       {},
@@ -771,6 +775,40 @@ func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 	}
 
 	return txReply, nil
+}
+
+// createOdrRawResult converts the passed order and associated parameters
+// to a raw order JSON object.
+func createOdrRawResult(chainParams *chaincfg.Params, modr *wire.MsgOdr,
+	odrHash string, blkHeader *wire.BlockHeader, blkHash string,
+	blkHeight int32, chainHeight int32) (*btcjson.OdrRawResult, error) {
+
+	modrHex, err := messageToHex(modr)
+	if err != nil {
+		return nil, err
+	}
+
+	odrReply := &btcjson.OdrRawResult{
+		Hex:      modrHex,
+		Odrid:    odrHash,
+		Hash:     modr.WitnessHash().String(),
+		Size:     int32(modr.SerializeSize()),
+		Vsize:    int32(mempool.GetTxVirtualSize(btcutil.NewOdr(modr).Tx)),
+		Vin:      createVinList(modr.MsgTx),
+		Vout:     createVoutList(modr.MsgTx, chainParams, nil),
+		Version:  modr.Version,
+		LockTime: modr.LockTime,
+	}
+
+	if blkHeader != nil {
+		// This is not a typo, they are identical in bitcoind as well.
+		odrReply.Time = blkHeader.Timestamp.Unix()
+		odrReply.Blocktime = blkHeader.Timestamp.Unix()
+		odrReply.BlockHash = blkHash
+		odrReply.Confirmations = uint64(1 + chainHeight - blkHeight)
+	}
+
+	return odrReply, nil
 }
 
 // handleDecodeRawTransaction handles decoderawtransaction commands.
@@ -1472,6 +1510,29 @@ func (state *gbtWorkState) NotifyBlockConnected(blockHash *chainhash.Hash) {
 // existing block template is stale due to enough time passing and the contents
 // of the memory pool changing.
 func (state *gbtWorkState) NotifyMempoolTx(lastUpdated time.Time) {
+	go func() {
+		state.Lock()
+		defer state.Unlock()
+
+		// No need to notify anything if no block templates have been generated
+		// yet.
+		if state.prevHash == nil || state.lastGenerated.IsZero() {
+			return
+		}
+
+		if time.Now().After(state.lastGenerated.Add(time.Second *
+			gbtRegenerateSeconds)) {
+
+			state.notifyLongPollers(state.prevHash, lastUpdated)
+		}
+	}()
+}
+
+// NotifyMempoolTx uses the new last updated time for the order memory
+// pool to notify any long poll clients with a new block template when their
+// existing block template is stale due to enough time passing and the contents
+// of the memory pool changing.
+func (state *gbtWorkState) NotifyMembookOdr(lastUpdated time.Time) {
 	go func() {
 		state.Lock()
 		defer state.Unlock()
@@ -2533,6 +2594,26 @@ func handleGetRawMempool(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	return hashStrings, nil
 }
 
+// handleGetRawMembook implements the getrawMembook command.
+func handleGetRawMembook(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GetRawMembookCmd)
+	mb := s.cfg.OdrMemBook
+
+	if c.Verbose != nil && *c.Verbose {
+		return mb.RawMembookVerbose(), nil
+	}
+
+	// The response is simply an array of the Order hashes if the
+	// verbose flag is not set.
+	descs := mb.OdrDescs()
+	hashStrings := make([]string, len(descs))
+	for i := range hashStrings {
+		hashStrings[i] = descs[i].Odr.Hash().String()
+	}
+
+	return hashStrings, nil
+}
+
 // handleGetRawTransaction implements the getrawtransaction command.
 func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.GetRawTransactionCmd)
@@ -2650,6 +2731,78 @@ func handleGetRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan str
 		return nil, err
 	}
 	return *rawTxn, nil
+}
+
+// handleGetRawOrder implements the getraworder command.
+func handleGetRawOrder(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GetRawOrderCmd)
+
+	// Convert the provided order hash hex to a Hash.
+	odrHash, err := chainhash.NewHashFromStr(c.Odrid)
+	if err != nil {
+		return nil, rpcDecodeHexError(c.Odrid)
+	}
+
+	verbose := false
+	if c.Verbose != nil {
+		verbose = *c.Verbose != 0
+	}
+
+	// Try to fetch the order from the memory pool and if that fails,
+	// try the block database.
+	var modr *wire.MsgOdr
+	var blkHash *chainhash.Hash
+	var blkHeight int32
+	odr, err := s.cfg.OdrMemBook.FetchOrder(odrHash)
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code: btcjson.ErrRPCNoOdrInfo,
+			Message: "The order index must be " +
+				"implemented to query the blockchain " +
+				"(specify --odrindex)",
+		}
+	}
+
+	// When the verbose flag isn't set, simply return the
+	// network-serialized order as a hex-encoded string.
+	if !verbose {
+		// Note that this is intentionally not directly
+		// returning because the first return value is a
+		// string and it would result in returning an empty
+		// string to the client instead of nothing (nil) in the
+		// case of an error.
+		modrHex, err := messageToHex(odr)
+		if err != nil {
+			return nil, err
+		}
+		return modrHex, nil
+	}
+
+	modr = odr.MsgOdr
+
+	// The verbose flag is set, so generate the JSON object and return it.
+	var blkHeader *wire.BlockHeader
+	var blkHashStr string
+	var chainHeight int32
+	if blkHash != nil {
+		// Fetch the header from chain.
+		header, err := s.cfg.Chain.HeaderByHash(blkHash)
+		if err != nil {
+			context := "Failed to fetch block header"
+			return nil, internalRPCError(err.Error(), context)
+		}
+
+		blkHeader = &header
+		blkHashStr = blkHash.String()
+		chainHeight = s.cfg.Chain.BestSnapshot().Height
+	}
+
+	rawOdrn, err := createOdrRawResult(s.cfg.ChainParams, modr, odrHash.String(),
+		blkHeader, blkHashStr, blkHeight, chainHeight)
+	if err != nil {
+		return nil, err
+	}
+	return *rawOdrn, nil
 }
 
 // handleGetTxOut handles gettxout commands.
@@ -3298,6 +3451,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 // handleSendRawTransaction implements the sendrawtransaction command.
 func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	c := cmd.(*btcjson.SendRawTransactionCmd)
+
 	// Deserialize and send off to tx relay
 	hexStr := c.HexTx
 	if len(hexStr)%2 != 0 {
@@ -3370,6 +3524,77 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 	s.cfg.ConnMgr.AddRebroadcastInventory(iv, txD)
 
 	return tx.Hash().String(), nil
+}
+
+// handleSendRawOrder implements the sendraworder command.
+func handleSendRawOrder(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.SendRawOrderCmd)
+
+	// Deserialize and send off to order relay
+	hexStr := c.HexOrder
+	if len(hexStr)%2 != 0 {
+		hexStr = "0" + hexStr
+	}
+	serializedOrder, err := hex.DecodeString(hexStr)
+	if err != nil {
+		return nil, rpcDecodeHexError(hexStr)
+	}
+	msgOrder := wire.NewMsgOdr(wire.OdrVersion)
+	err = msgOrder.Deserialize(bytes.NewReader(serializedOrder))
+	if err != nil {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCDeserialization,
+			Message: "TX decode failed: " + err.Error(),
+		}
+	}
+
+	// Use 0 for the tag to represent local node.
+	order := btcutil.NewOdr(msgOrder)
+	acceptedOrder, err := s.cfg.OdrMemBook.ProcessOrder(order)
+	if err != nil {
+		// When the error is a rule error, it means the order was
+		// simply rejected as opposed to something actually going wrong,
+		// so log it as such.  Otherwise, something really did go wrong,
+		// so log it as an actual error.  In both cases, a JSON-RPC
+		// error is returned to the client with the deserialization
+		// error code (to match bitcoind behavior).
+		if _, ok := err.(mempool.RuleError); ok {
+			rpcsLog.Debugf("Rejected order %v: %v", order.Hash(), err)
+		} else {
+			rpcsLog.Errorf("Failed to process order %v: %v", order.Hash(), err)
+		}
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCDeserialization,
+			Message: "ODR rejected: " + err.Error(),
+		}
+	}
+
+	// Also, since an error is being returned to the caller, ensure the
+	// order is removed from the memory pool.
+	if acceptedOrder == nil {
+		s.cfg.OdrMemBook.RemoveOrder(order)
+
+		errStr := fmt.Sprintf("order %v is not in accepted list", order.Hash())
+		return nil, internalRPCError(errStr, "")
+	}
+
+	acceptedOrders := []*mempool.OdrDesc{acceptedOrder}
+
+	// Generate and relay inventory vectors for all newly accepted
+	// orders into the memory pool due to the original being
+	// accepted.
+	s.cfg.ConnMgr.RelayOrders(acceptedOrders)
+
+	// Notify both websocket and getblocktemplate long poll clients of all
+	// newly accepted orders.
+	s.NotifyNewOrders(acceptedOrders)
+
+	// Keep track of all the sendraworder request orderns so that they
+	// can be rebroadcast if they don't make their way into a block.
+	iv := wire.NewInvVect(wire.InvTypeOdr, acceptedOrder.Odr.Hash())
+	s.cfg.ConnMgr.AddRebroadcastInventory(iv, acceptedOrder)
+
+	return order.Hash().String(), nil
 }
 
 // handleSetGenerate implements the setgenerate command.
@@ -3713,6 +3938,20 @@ func (s *rpcServer) NotifyNewTransactions(txns []*mempool.TxDesc) {
 		// Potentially notify any getblocktemplate long poll clients
 		// about stale block templates due to the new transaction.
 		s.gbtWorkState.NotifyMempoolTx(s.cfg.TxMemPool.LastUpdated())
+	}
+}
+
+// NotifyNewTransactions notifies both websocket and getblocktemplate long
+// poll clients of the passed orders.  This function should be called
+// whenever new orders are added to the mempool.
+func (s *rpcServer) NotifyNewOrders(orders []*mempool.OdrDesc) {
+	for _, oD := range orders {
+		// Notify websocket clients about mempool orders.
+		s.ntfnMgr.NotifyMembookOdr(oD.Odr, true)
+
+		// Potentially notify any getblocktemplate long poll clients
+		// about stale block templates due to the new orders.
+		s.gbtWorkState.NotifyMembookOdr(s.cfg.OdrMemBook.LastUpdated())
 	}
 }
 
@@ -4192,6 +4431,10 @@ type rpcserverConnManager interface {
 	// RelayTransactions generates and relays inventory vectors for all of
 	// the passed transactions to all connected peers.
 	RelayTransactions(txns []*mempool.TxDesc)
+
+	// RelayOrders generates and relays inventory vectors for all of
+	// the passed orders to all connected peers.
+	RelayOrders(orders []*mempool.OdrDesc)
 }
 
 // rpcserverSyncManager represents a sync manager for use with the RPC server.
@@ -4251,6 +4494,8 @@ type rpcserverConfig struct {
 
 	// TxMemPool defines the transaction memory pool to interact with.
 	TxMemPool *mempool.TxPool
+	// OdrMemBook defines the order memory book to interact with.
+	OdrMemBook *mempool.OdrBook
 
 	// These fields allow the RPC server to interface with mining.
 	//

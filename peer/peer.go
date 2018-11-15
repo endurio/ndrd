@@ -121,6 +121,12 @@ type MessageListeners struct {
 	// OnTx is invoked when a peer receives a tx bitcoin message.
 	OnTx func(p *Peer, msg *wire.MsgTx)
 
+	// OnMemBook is invoked when a peer receives a order book bitcoin message.
+	OnMemBook func(p *Peer, msg *wire.MsgMemBook)
+
+	// OnOdr is invoked when a peer receives a order bitcoin message.
+	OnOdr func(p *Peer, msg *wire.MsgOdr)
+
 	// OnBlock is invoked when a peer receives a block bitcoin message.
 	OnBlock func(p *Peer, msg *wire.MsgBlock, buf []byte)
 
@@ -947,7 +953,7 @@ func (p *Peer) PushRejectMsg(command string, code wire.RejectCode, reason string
 	}
 
 	msg := wire.NewMsgReject(command, code, reason)
-	if command == wire.CmdTx || command == wire.CmdBlock {
+	if command == wire.CmdTx || command == wire.CmdBlock || command == wire.CmdOdr {
 		if hash == nil {
 			log.Warnf("Sending a reject message for command "+
 				"type %v which should have specified a hash "+
@@ -1157,6 +1163,7 @@ func (p *Peer) maybeAddDeadline(pendingResponses map[string]time.Time, msgCmd st
 		pendingResponses[wire.CmdBlock] = deadline
 		pendingResponses[wire.CmdMerkleBlock] = deadline
 		pendingResponses[wire.CmdTx] = deadline
+		pendingResponses[wire.CmdOdr] = deadline
 		pendingResponses[wire.CmdNotFound] = deadline
 
 	case wire.CmdGetHeaders:
@@ -1216,10 +1223,13 @@ out:
 					fallthrough
 				case wire.CmdTx:
 					fallthrough
+				case wire.CmdOdr:
+					fallthrough
 				case wire.CmdNotFound:
 					delete(pendingResponses, wire.CmdBlock)
 					delete(pendingResponses, wire.CmdMerkleBlock)
 					delete(pendingResponses, wire.CmdTx)
+					delete(pendingResponses, wire.CmdOdr)
 					delete(pendingResponses, wire.CmdNotFound)
 
 				default:
@@ -1427,6 +1437,16 @@ out:
 		case *wire.MsgTx:
 			if p.cfg.Listeners.OnTx != nil {
 				p.cfg.Listeners.OnTx(p, msg)
+			}
+
+		case *wire.MsgMemBook:
+			if p.cfg.Listeners.OnMemBook != nil {
+				p.cfg.Listeners.OnMemBook(p, msg)
+			}
+
+		case *wire.MsgOdr:
+			if p.cfg.Listeners.OnOdr != nil {
+				p.cfg.Listeners.OnOdr(p, msg)
 			}
 
 		case *wire.MsgBlock:

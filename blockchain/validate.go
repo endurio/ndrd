@@ -987,6 +987,112 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpo
 	return txFeeInSatoshi, nil
 }
 
+// CheckOrderInputs ...
+func CheckOrderInputs(order *btcutil.Odr, txHeight int32, utxoView *UtxoViewpoint, chainParams *chaincfg.Params) (int64, int64, error) {
+	// Coinbase transactions have no inputs.
+	if IsCoinBase(order.Tx) {
+		return 0, 0, nil
+	}
+
+	txHash := order.Hash()
+	valueChange := make(map[wire.TokenIdentity]int64, 2)
+
+	for _, token := range []wire.TokenIdentity{wire.STB, wire.NDR} {
+		var totalSatoshiIn int64
+		for txInIndex, txIn := range order.TxIn {
+			// Ensure the referenced input transaction is available.
+			utxo := utxoView.LookupEntry(txIn.PreviousOutPoint)
+			if utxo == nil || utxo.IsSpent() {
+				str := fmt.Sprintf("output %v referenced from "+
+					"order %s:%d either does not exist or "+
+					"has already been spent", txIn.PreviousOutPoint,
+					order.Hash(), txInIndex)
+				return 0, 0, ruleError(ErrMissingTxOut, str)
+			}
+
+			if utxo.TokenID() != token {
+				continue
+			}
+
+			// Ensure the transaction is not spending coins which have not
+			// yet reached the required coinbase maturity.
+			if utxo.IsCoinBase() {
+				originHeight := utxo.BlockHeight()
+				blocksSincePrev := txHeight - originHeight
+				coinbaseMaturity := int32(chainParams.CoinbaseMaturity)
+				if blocksSincePrev < coinbaseMaturity {
+					str := fmt.Sprintf("tried to spend coinbase "+
+						"transaction output %v from height %v "+
+						"at height %v before required maturity "+
+						"of %v blocks", txIn.PreviousOutPoint,
+						originHeight, txHeight,
+						coinbaseMaturity)
+					return 0, 0, ruleError(ErrImmatureSpend, str)
+				}
+			}
+
+			// Ensure the transaction amounts are in range.  Each of the
+			// output values of the input transactions must not be negative
+			// or more than the max allowed per transaction.  All amounts in
+			// a transaction are in a unit value known as a satoshi.  One
+			// bitcoin is a quantity of satoshi as defined by the
+			// SatoshiPerBitcoin constant.
+			originTxSatoshi := utxo.Amount()
+			if originTxSatoshi < 0 {
+				str := fmt.Sprintf("order output has negative "+
+					"value of %v", btcutil.Amount(originTxSatoshi))
+				return 0, 0, ruleError(ErrBadTxOutValue, str)
+			}
+			if originTxSatoshi > btcutil.MaxSatoshi {
+				str := fmt.Sprintf("order output value of %v is "+
+					"higher than max allowed value of %v",
+					btcutil.Amount(originTxSatoshi),
+					btcutil.MaxSatoshi)
+				return 0, 0, ruleError(ErrBadTxOutValue, str)
+			}
+
+			// The total of all outputs must not be more than the max
+			// allowed per transaction.  Also, we could potentially overflow
+			// the accumulator so check for overflow.
+			lastSatoshiIn := totalSatoshiIn
+			totalSatoshiIn += originTxSatoshi
+			if totalSatoshiIn < lastSatoshiIn ||
+				totalSatoshiIn > btcutil.MaxSatoshi {
+				str := fmt.Sprintf("total value of all order "+
+					"inputs is %v which is higher than max "+
+					"allowed value of %v", totalSatoshiIn,
+					btcutil.MaxSatoshi)
+				return 0, 0, ruleError(ErrBadTxOutValue, str)
+			}
+		}
+
+		// Calculate the total output amount for this transaction.  It is safe
+		// to ignore overflow and out of range errors here because those error
+		// conditions would have already been caught by checkTransactionSanity.
+		var totalSatoshiOut int64
+		for _, txOut := range order.TxOut {
+			if txOut.TokenID() != token {
+				continue
+			}
+			totalSatoshiOut += txOut.Value
+		}
+
+		// NOTE: bitcoind checks if the transaction fees are < 0 here, but that
+		// is an impossible condition because of the check above that ensures
+		// the inputs are >= the outputs.
+		valueChange[token] = totalSatoshiIn - totalSatoshiOut
+	}
+
+	if valueChange[wire.STB]^valueChange[wire.NDR] > 0 {
+		str := fmt.Sprintf("order %v does not exchange between tokens, "+
+			"STB value change: %v, NDR value change: %v",
+			txHash, valueChange[wire.STB], valueChange[wire.NDR])
+		return valueChange[wire.STB], valueChange[wire.NDR], ruleError(ErrSpendTooHigh, str)
+	}
+
+	return valueChange[wire.STB], valueChange[wire.NDR], nil
+}
+
 // checkConnectBlock performs several checks to confirm connecting the passed
 // block to the chain represented by the passed view does not violate any rules.
 // In addition, the passed view is updated to spend all of the referenced

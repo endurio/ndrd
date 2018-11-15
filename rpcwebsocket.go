@@ -247,6 +247,26 @@ func (m *wsNotificationManager) NotifyMempoolTx(tx *btcutil.Tx, isNew bool) {
 	}
 }
 
+// NotifyMempoolTx passes a transaction accepted by mempool to the
+// notification manager for transaction notification processing.  If
+// isNew is true, the tx is is a new transaction, rather than one
+// added to the mempool during a reorg.
+func (m *wsNotificationManager) NotifyMembookOdr(odr *btcutil.Odr, isNew bool) {
+	n := &notificationOdrAcceptedByMempool{
+		isNew: isNew,
+		odr:   odr,
+	}
+
+	// As NotifyMembookOdr will be called by mempool and the RPC server
+	// may no longer be running, use a select statement to unblock
+	// enqueuing the notification once the RPC server has begun
+	// shutting down.
+	select {
+	case m.queueNotification <- n:
+	case <-m.quit:
+	}
+}
+
 // wsClientFilter tracks relevant addresses for each websocket client for
 // the `rescanblocks` extension. It is modified by the `loadtxfilter` command.
 //
@@ -452,6 +472,10 @@ type notificationTxAcceptedByMempool struct {
 	isNew bool
 	tx    *btcutil.Tx
 }
+type notificationOdrAcceptedByMempool struct {
+	isNew bool
+	odr   *btcutil.Odr
+}
 
 // Notification control requests
 type notificationRegisterClient wsClient
@@ -460,6 +484,8 @@ type notificationRegisterBlocks wsClient
 type notificationUnregisterBlocks wsClient
 type notificationRegisterNewMempoolTxs wsClient
 type notificationUnregisterNewMempoolTxs wsClient
+type notificationRegisterNewMembookOdrs wsClient
+type notificationUnregisterNewMembookOdrs wsClient
 type notificationRegisterSpent struct {
 	wsc *wsClient
 	ops []*wire.OutPoint
@@ -492,6 +518,7 @@ func (m *wsNotificationManager) notificationHandler() {
 	// since it is quite a bit more efficient than using the entire struct.
 	blockNotifications := make(map[chan struct{}]*wsClient)
 	txNotifications := make(map[chan struct{}]*wsClient)
+	odrNotifications := make(map[chan struct{}]*wsClient)
 	watchedOutPoints := make(map[wire.OutPoint]map[chan struct{}]*wsClient)
 	watchedAddrs := make(map[string]map[chan struct{}]*wsClient)
 
@@ -539,6 +566,13 @@ out:
 				}
 				m.notifyForTx(watchedOutPoints, watchedAddrs, n.tx, nil)
 				m.notifyRelevantTxAccepted(n.tx, clients)
+
+			case *notificationOdrAcceptedByMempool:
+				if n.isNew && len(odrNotifications) != 0 {
+					m.notifyForNewOdr(odrNotifications, n.odr)
+				}
+				m.notifyForOdr(watchedOutPoints, watchedAddrs, n.odr, nil)
+				m.notifyRelevantOdrAccepted(n.odr, clients)
 
 			case *notificationRegisterBlocks:
 				wsc := (*wsClient)(n)
@@ -820,6 +854,18 @@ func (m *wsNotificationManager) UnregisterNewMempoolTxsUpdates(wsc *wsClient) {
 	m.queueNotification <- (*notificationUnregisterNewMempoolTxs)(wsc)
 }
 
+// RegisterNewMembookOdrsUpdates requests notifications to the passed websocket
+// client when new orders are added to the memory book.
+func (m *wsNotificationManager) RegisterNewMembookOdrsUpdates(wsc *wsClient) {
+	m.queueNotification <- (*notificationRegisterNewMembookOdrs)(wsc)
+}
+
+// UnregisterNewMembookOdrsUpdates removes notifications to the passed websocket
+// client when new order are added to the memory book.
+func (m *wsNotificationManager) UnregisterNewMembookOdrsUpdates(wsc *wsClient) {
+	m.queueNotification <- (*notificationUnregisterNewMembookOdrs)(wsc)
+}
+
 // notifyForNewTx notifies websocket clients that have registered for updates
 // when a new transaction is added to the memory pool.
 func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClient, tx *btcutil.Tx) {
@@ -859,6 +905,55 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClie
 				verboseNtfn)
 			if err != nil {
 				rpcsLog.Errorf("Failed to marshal verbose tx "+
+					"notification: %s", err.Error())
+				return
+			}
+			wsc.QueueNotification(marshalledJSONVerbose)
+		} else {
+			wsc.QueueNotification(marshalledJSON)
+		}
+	}
+}
+
+// notifyForNewOdr notifies websocket clients that have registered for updates
+// when a new order is added to the memory pool.
+func (m *wsNotificationManager) notifyForNewOdr(clients map[chan struct{}]*wsClient, odr *btcutil.Odr) {
+	odrHashStr := odr.Hash().String()
+	modr := odr.MsgOdr
+
+	var amount int64
+	for _, odrOut := range modr.TxOut {
+		amount += odrOut.Value
+	}
+
+	ntfn := btcjson.NewOdrAcceptedNtfn(odrHashStr, btcutil.Amount(amount).ToBTC())
+	marshalledJSON, err := btcjson.MarshalCmd(nil, ntfn)
+	if err != nil {
+		rpcsLog.Errorf("Failed to marshal odr notification: %s", err.Error())
+		return
+	}
+
+	var verboseNtfn *btcjson.OdrAcceptedVerboseNtfn
+	var marshalledJSONVerbose []byte
+	for _, wsc := range clients {
+		if wsc.verboseOdrUpdates {
+			if marshalledJSONVerbose != nil {
+				wsc.QueueNotification(marshalledJSONVerbose)
+				continue
+			}
+
+			net := m.server.cfg.ChainParams
+			rawOdr, err := createOdrRawResult(net, modr, odrHashStr, nil,
+				"", 0, 0)
+			if err != nil {
+				return
+			}
+
+			verboseNtfn = btcjson.NewOdrAcceptedVerboseNtfn(*rawOdr)
+			marshalledJSONVerbose, err = btcjson.MarshalCmd(nil,
+				verboseNtfn)
+			if err != nil {
+				rpcsLog.Errorf("Failed to marshal verbose odr "+
 					"notification: %s", err.Error())
 				return
 			}
@@ -1059,6 +1154,29 @@ func (m *wsNotificationManager) notifyRelevantTxAccepted(tx *btcutil.Tx,
 	}
 }
 
+// notifyRelevantOdrAccepted examines the inputs and outputs of the passed
+// order, notifying websocket clients of outputs spending to a watched
+// address and inputs spending a watched outpoint.  Any outputs paying to a
+// watched address result in the output being watched as well for future
+// notifications.
+func (m *wsNotificationManager) notifyRelevantOdrAccepted(odr *btcutil.Odr,
+	clients map[chan struct{}]*wsClient) {
+
+	clientsToNotify := m.subscribedClients(odr.Tx, clients)
+
+	if len(clientsToNotify) != 0 {
+		n := btcjson.NewRelevantOdrAcceptedNtfn(txHexString(odr.MsgTx()))
+		marshalled, err := btcjson.MarshalCmd(nil, n)
+		if err != nil {
+			rpcsLog.Errorf("Failed to marshal notification: %v", err)
+			return
+		}
+		for quitChan := range clientsToNotify {
+			clients[quitChan].QueueNotification(marshalled)
+		}
+	}
+}
+
 // notifyForTx examines the inputs and outputs of the passed transaction,
 // notifying websocket clients of outputs spending to a watched address
 // and inputs spending a watched outpoint.
@@ -1070,6 +1188,20 @@ func (m *wsNotificationManager) notifyForTx(ops map[wire.OutPoint]map[chan struc
 	}
 	if len(addrs) != 0 {
 		m.notifyForTxOuts(ops, addrs, tx, block)
+	}
+}
+
+// notifyForOdr examines the inputs and outputs of the passed order,
+// notifying websocket clients of outputs spending to a watched address
+// and inputs spending a watched outpoint.
+func (m *wsNotificationManager) notifyForOdr(ops map[wire.OutPoint]map[chan struct{}]*wsClient,
+	addrs map[string]map[chan struct{}]*wsClient, odr *btcutil.Odr, block *btcutil.Block) {
+
+	if len(ops) != 0 {
+		m.notifyForTxIns(ops, odr.Tx, block)
+	}
+	if len(addrs) != 0 {
+		m.notifyForTxOuts(ops, addrs, odr.Tx, block)
 	}
 }
 
@@ -1277,6 +1409,10 @@ type wsClient struct {
 	// verboseTxUpdates specifies whether a client has requested verbose
 	// information about all new transactions.
 	verboseTxUpdates bool
+
+	// verboseOdrUpdates specifies whether a client has requested verbose
+	// information about all new orders.
+	verboseOdrUpdates bool
 
 	// addrRequests is a set of addresses the caller has requested to be
 	// notified about.  It is maintained here so all requests can be removed
@@ -1880,6 +2016,26 @@ func handleNotifyNewTransactions(wsc *wsClient, icmd interface{}) (interface{}, 
 // command extension for websocket connections.
 func handleStopNotifyNewTransactions(wsc *wsClient, icmd interface{}) (interface{}, error) {
 	wsc.server.ntfnMgr.UnregisterNewMempoolTxsUpdates(wsc)
+	return nil, nil
+}
+
+// handleNotifyNewTransations implements the notifyneworders command
+// extension for websocket connections.
+func handleNotifyNewOrders(wsc *wsClient, icmd interface{}) (interface{}, error) {
+	cmd, ok := icmd.(*btcjson.NotifyNewOrdersCmd)
+	if !ok {
+		return nil, btcjson.ErrRPCInternal
+	}
+
+	wsc.verboseOdrUpdates = cmd.Verbose != nil && *cmd.Verbose
+	wsc.server.ntfnMgr.RegisterNewMembookOdrsUpdates(wsc)
+	return nil, nil
+}
+
+// handleStopNotifyNewTransations implements the stopnotifyneworders
+// command extension for websocket connections.
+func handleStopNotifyNewOrders(wsc *wsClient, icmd interface{}) (interface{}, error) {
+	wsc.server.ntfnMgr.UnregisterNewMembookOdrsUpdates(wsc)
 	return nil, nil
 }
 

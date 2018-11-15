@@ -273,6 +273,15 @@ type GetRawMempoolVerboseResult struct {
 	Depends          []string `json:"depends"`
 }
 
+// GetRawMembookVerboseResult models the data returned from the getrawmembook
+// command when the verbose flag is set.  When the verbose flag is not set,
+// getrawmembook returns an array of order hashes.
+type GetRawMembookVerboseResult struct {
+	Size    int32    `json:"size"`
+	Vsize   int32    `json:"vsize"`
+	Depends []string `json:"depends"`
+}
+
 // ScriptPubKeyResult models the scriptPubKey data of a tx script.  It is
 // defined separately since it is used by multiple commands.
 type ScriptPubKeyResult struct {
@@ -502,6 +511,23 @@ type InfoChainResult struct {
 type TxRawResult struct {
 	Hex           string `json:"hex"`
 	Txid          string `json:"txid"`
+	Hash          string `json:"hash,omitempty"`
+	Size          int32  `json:"size,omitempty"`
+	Vsize         int32  `json:"vsize,omitempty"`
+	Version       int32  `json:"version"`
+	LockTime      uint32 `json:"locktime"`
+	Vin           []Vin  `json:"vin"`
+	Vout          []Vout `json:"vout"`
+	BlockHash     string `json:"blockhash,omitempty"`
+	Confirmations uint64 `json:"confirmations,omitempty"`
+	Time          int64  `json:"time,omitempty"`
+	Blocktime     int64  `json:"blocktime,omitempty"`
+}
+
+// OdrRawResult models the data from the getrawtransaction command.
+type OdrRawResult struct {
+	Hex           string `json:"hex"`
+	Odrid         string `json:"txid"`
 	Hash          string `json:"hash,omitempty"`
 	Size          int32  `json:"size,omitempty"`
 	Vsize         int32  `json:"vsize,omitempty"`

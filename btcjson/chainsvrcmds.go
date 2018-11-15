@@ -458,6 +458,22 @@ func NewGetRawMempoolCmd(verbose *bool) *GetRawMempoolCmd {
 	}
 }
 
+// GetRawMembookCmd defines the getmempool JSON-RPC command.
+type GetRawMembookCmd struct {
+	Verbose *bool `jsonrpcdefault:"false"`
+}
+
+// NewGetRawMembookCmd returns a new instance which can be used to issue a
+// getrawmempool JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewGetRawMembookCmd(verbose *bool) *GetRawMembookCmd {
+	return &GetRawMembookCmd{
+		Verbose: verbose,
+	}
+}
+
 // GetRawTransactionCmd defines the getrawtransaction JSON-RPC command.
 //
 // NOTE: This field is an int versus a bool to remain compatible with Bitcoin
@@ -475,6 +491,27 @@ type GetRawTransactionCmd struct {
 func NewGetRawTransactionCmd(txHash string, verbose *int) *GetRawTransactionCmd {
 	return &GetRawTransactionCmd{
 		Txid:    txHash,
+		Verbose: verbose,
+	}
+}
+
+// GetRawOrderCmd defines the getraworder JSON-RPC command.
+//
+// NOTE: This field is an int versus a bool to remain compatible with Bitcoin
+// Core even though it really should be a bool.
+type GetRawOrderCmd struct {
+	Odrid   string
+	Verbose *int `jsonrpcdefault:"0"`
+}
+
+// NewGetRawOrderCmd returns a new instance which can be used to issue a
+// getraworder JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewGetRawOrderCmd(odrHash string, verbose *int) *GetRawOrderCmd {
+	return &GetRawOrderCmd{
+		Odrid:   odrHash,
 		Verbose: verbose,
 	}
 }
@@ -652,6 +689,24 @@ func NewSendRawTransactionCmd(hexTx string, allowHighFees *bool) *SendRawTransac
 	}
 }
 
+// SendRawOrderCmd defines the sendrawtransaction JSON-RPC command.
+type SendRawOrderCmd struct {
+	HexOrder      string
+	AllowHighFees *bool `jsonrpcdefault:"false"`
+}
+
+// NewSendRawOrderCmd returns a new instance which can be used to issue a
+// sendraworder JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewSendRawOrderCmd(hexOrder string, allowHighFees *bool) *SendRawOrderCmd {
+	return &SendRawOrderCmd{
+		HexOrder:      hexOrder,
+		AllowHighFees: allowHighFees,
+	}
+}
+
 // SetGenerateCmd defines the setgenerate JSON-RPC command.
 type SetGenerateCmd struct {
 	Generate     bool
@@ -817,6 +872,7 @@ func init() {
 	MustRegisterCmd("reconsiderblock", (*ReconsiderBlockCmd)(nil), flags)
 	MustRegisterCmd("searchrawtransactions", (*SearchRawTransactionsCmd)(nil), flags)
 	MustRegisterCmd("sendrawtransaction", (*SendRawTransactionCmd)(nil), flags)
+	MustRegisterCmd("sendraworder", (*SendRawOrderCmd)(nil), flags)
 	MustRegisterCmd("setgenerate", (*SetGenerateCmd)(nil), flags)
 	MustRegisterCmd("stop", (*StopCmd)(nil), flags)
 	MustRegisterCmd("submitblock", (*SubmitBlockCmd)(nil), flags)

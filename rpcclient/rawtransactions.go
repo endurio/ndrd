@@ -306,6 +306,55 @@ func (c *Client) SendRawTransaction(tx *wire.MsgTx, allowHighFees bool) (*chainh
 	return c.SendRawTransactionAsync(tx, allowHighFees).Receive()
 }
 
+// FutureSendRawOrderResult is a future promise to deliver the result
+// of a SendRawOrderAsync RPC invocation (or an applicable error).
+type FutureSendRawOrderResult chan *response
+
+// Receive waits for the response promised by the future and returns the result
+// of submitting the encoded order to the server which then relays it to
+// the network.
+func (r FutureSendRawOrderResult) Receive() (*chainhash.Hash, error) {
+	res, err := receiveFuture(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal result as a string.
+	var orderHashStr string
+	err = json.Unmarshal(res, &orderHashStr)
+	if err != nil {
+		return nil, err
+	}
+
+	return chainhash.NewHashFromStr(orderHashStr)
+}
+
+// SendRawOrderAsync returns an instance of a type that can be used to get
+// the result of the RPC at some future time by invoking the Receive function on
+// the returned instance.
+//
+// See SendRawOrder for the blocking version and more details.
+func (c *Client) SendRawOrderAsync(order *wire.MsgOdr, allowHighFees bool) FutureSendRawOrderResult {
+	orderHex := ""
+	if order != nil {
+		// Serialize the order and convert to hex string.
+		buf := bytes.NewBuffer(make([]byte, 0, order.SerializeSize()))
+		if err := order.Serialize(buf); err != nil {
+			return newFutureError(err)
+		}
+		orderHex = hex.EncodeToString(buf.Bytes())
+	}
+
+	cmd := btcjson.NewSendRawOrderCmd(orderHex, &allowHighFees)
+	return c.sendCmd(cmd)
+}
+
+// SendRawOrder submits the encoded order to the server which will
+// then relay it to the network.
+func (c *Client) SendRawOrder(order *wire.MsgOdr, allowHighFees bool) (*chainhash.Hash, error) {
+	return c.SendRawOrderAsync(order, allowHighFees).Receive()
+}
+
 // FutureSignRawTransactionResult is a future promise to deliver the result
 // of one of the SignRawTransactionAsync family of RPC invocations (or an
 // applicable error).

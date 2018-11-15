@@ -38,12 +38,14 @@ const (
 	CmdNotFound     = "notfound"
 	CmdBlock        = "block"
 	CmdTx           = "tx"
+	CmdOdr          = "odr"
 	CmdGetHeaders   = "getheaders"
 	CmdHeaders      = "headers"
 	CmdPing         = "ping"
 	CmdPong         = "pong"
 	CmdAlert        = "alert"
 	CmdMemPool      = "mempool"
+	CmdMemBook      = "membook"
 	CmdFilterAdd    = "filteradd"
 	CmdFilterClear  = "filterclear"
 	CmdFilterLoad   = "filterload"
@@ -122,6 +124,9 @@ func makeEmptyMessage(command string) (Message, error) {
 
 	case CmdTx:
 		msg = &MsgTx{}
+
+	case CmdOdr:
+		msg = &MsgOdr{}
 
 	case CmdPing:
 		msg = &MsgPing{}

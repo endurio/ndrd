@@ -75,6 +75,21 @@ const (
 	// from the chain server that inform a client that a transaction that
 	// matches the loaded filter was accepted by the mempool.
 	RelevantTxAcceptedNtfnMethod = "relevanttxaccepted"
+
+	// OdrAcceptedNtfnMethod is the method used for notifications from the
+	// chain server that a order has been accepted into the mempool.
+	OdrAcceptedNtfnMethod = "odraccepted"
+
+	// OdrAcceptedVerboseNtfnMethod is the method used for notifications from
+	// the chain server that a order has been accepted into the
+	// mempool.  This differs from OdrAcceptedNtfnMethod in that it provides
+	// more details in the notification.
+	OdrAcceptedVerboseNtfnMethod = "odracceptedverbose"
+
+	// RelevantOdrAcceptedNtfnMethod is the new method used for notifications
+	// from the chain server that inform a client that a order that
+	// matches the loaded filter was accepted by the mempool.
+	RelevantOdrAcceptedNtfnMethod = "relevantodraccepted"
 )
 
 // BlockConnectedNtfn defines the blockconnected JSON-RPC notification.
@@ -285,6 +300,46 @@ func NewRelevantTxAcceptedNtfn(txHex string) *RelevantTxAcceptedNtfn {
 	return &RelevantTxAcceptedNtfn{Transaction: txHex}
 }
 
+// OdrAcceptedNtfn defines the odraccepted JSON-RPC notification.
+type OdrAcceptedNtfn struct {
+	OdrID  string
+	Amount float64
+}
+
+// NewOdrAcceptedNtfn returns a new instance which can be used to issue a
+// odraccepted JSON-RPC notification.
+func NewOdrAcceptedNtfn(odrHash string, amount float64) *OdrAcceptedNtfn {
+	return &OdrAcceptedNtfn{
+		OdrID:  odrHash,
+		Amount: amount,
+	}
+}
+
+// OdrAcceptedVerboseNtfn defines the odracceptedverbose JSON-RPC notification.
+type OdrAcceptedVerboseNtfn struct {
+	RawOdr OdrRawResult
+}
+
+// NewOdrAcceptedVerboseNtfn returns a new instance which can be used to issue a
+// odracceptedverbose JSON-RPC notification.
+func NewOdrAcceptedVerboseNtfn(rawOdr OdrRawResult) *OdrAcceptedVerboseNtfn {
+	return &OdrAcceptedVerboseNtfn{
+		RawOdr: rawOdr,
+	}
+}
+
+// RelevantOdrAcceptedNtfn defines the parameters to the relevantodraccepted
+// JSON-RPC notification.
+type RelevantOdrAcceptedNtfn struct {
+	Transaction string `json:"transaction"`
+}
+
+// NewRelevantOdrAcceptedNtfn returns a new instance which can be used to issue a
+// relevanodraccepted JSON-RPC notification.
+func NewRelevantOdrAcceptedNtfn(odrHex string) *RelevantOdrAcceptedNtfn {
+	return &RelevantOdrAcceptedNtfn{Transaction: odrHex}
+}
+
 func init() {
 	// The commands in this file are only usable by websockets and are
 	// notifications.
@@ -301,4 +356,7 @@ func init() {
 	MustRegisterCmd(TxAcceptedNtfnMethod, (*TxAcceptedNtfn)(nil), flags)
 	MustRegisterCmd(TxAcceptedVerboseNtfnMethod, (*TxAcceptedVerboseNtfn)(nil), flags)
 	MustRegisterCmd(RelevantTxAcceptedNtfnMethod, (*RelevantTxAcceptedNtfn)(nil), flags)
+	MustRegisterCmd(OdrAcceptedNtfnMethod, (*OdrAcceptedNtfn)(nil), flags)
+	MustRegisterCmd(OdrAcceptedVerboseNtfnMethod, (*OdrAcceptedVerboseNtfn)(nil), flags)
+	MustRegisterCmd(RelevantOdrAcceptedNtfnMethod, (*RelevantOdrAcceptedNtfn)(nil), flags)
 }
