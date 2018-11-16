@@ -523,6 +523,16 @@ func (c *Client) reregisterNtfns() error {
 		}
 	}
 
+	// Reregister notifyneworders if needed.
+	if stateCopy.notifyNewOdr || stateCopy.notifyNewOdrVerbose {
+		log.Debugf("Reregistering [notifyneworders] (verbose=%v)",
+			stateCopy.notifyNewOdrVerbose)
+		err := c.NotifyNewOrders(stateCopy.notifyNewOdrVerbose)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Reregister the combination of all previously registered notifyspent
 	// outpoints in one command if needed.
 	nslen := len(stateCopy.notifySpent)

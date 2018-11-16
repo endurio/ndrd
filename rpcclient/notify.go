@@ -32,11 +32,13 @@ var (
 // registered notification so the state can be automatically re-established on
 // reconnect.
 type notificationState struct {
-	notifyBlocks       bool
-	notifyNewTx        bool
-	notifyNewTxVerbose bool
-	notifyReceived     map[string]struct{}
-	notifySpent        map[btcjson.OutPoint]struct{}
+	notifyBlocks        bool
+	notifyNewTx         bool
+	notifyNewTxVerbose  bool
+	notifyNewOdr        bool
+	notifyNewOdrVerbose bool
+	notifyReceived      map[string]struct{}
+	notifySpent         map[btcjson.OutPoint]struct{}
 }
 
 // Copy returns a deep copy of the receiver.
@@ -1035,6 +1037,55 @@ func (c *Client) NotifyNewTransactionsAsync(verbose bool) FutureNotifyNewTransac
 // NOTE: This is a btcd extension and requires a websocket connection.
 func (c *Client) NotifyNewTransactions(verbose bool) error {
 	return c.NotifyNewTransactionsAsync(verbose).Receive()
+}
+
+// FutureNotifyNewOrdersResult is a future promise to deliver the result
+// of a NotifyNewOrdersAsync RPC invocation (or an applicable error).
+type FutureNotifyNewOrdersResult chan *response
+
+// Receive waits for the response promised by the future and returns an error
+// if the registration was not successful.
+func (r FutureNotifyNewOrdersResult) Receive() error {
+	_, err := receiveFuture(r)
+	return err
+}
+
+// NotifyNewOrdersAsync returns an instance of a type that can be used to
+// get the result of the RPC at some future time by invoking the Receive
+// function on the returned instance.
+//
+// See NotifyNewOrdersAsync for the blocking version and more details.
+//
+// NOTE: This is a btcd extension and requires a websocket connection.
+func (c *Client) NotifyNewOrdersAsync(verbose bool) FutureNotifyNewOrdersResult {
+	// Not supported in HTTP POST mode.
+	if c.config.HTTPPostMode {
+		return newFutureError(ErrWebsocketsRequired)
+	}
+
+	// Ignore the notification if the client is not interested in
+	// notifications.
+	if c.ntfnHandlers == nil {
+		return newNilFutureResult()
+	}
+
+	cmd := btcjson.NewNotifyNewOrdersCmd(&verbose)
+	return c.sendCmd(cmd)
+}
+
+// NotifyNewOrders registers the client to receive notifications every
+// time a new order is accepted to the memory pool.  The notifications are
+// delivered to the notification handlers associated with the client.  Calling
+// this function has no effect if there are no notification handlers and will
+// result in an error if the client is configured to run in HTTP POST mode.
+//
+// The notifications delivered as a result of this call will be via one of
+// OnOdrAccepted (when verbose is false) or OnOdrAcceptedVerbose (when verbose is
+// true).
+//
+// NOTE: This is a btcd extension and requires a websocket connection.
+func (c *Client) NotifyNewOrders(verbose bool) error {
+	return c.NotifyNewOrdersAsync(verbose).Receive()
 }
 
 // FutureNotifyReceivedResult is a future promise to deliver the result of a

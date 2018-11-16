@@ -244,6 +244,7 @@ var rpcLimited = map[string]struct{}{
 	"loadtxfilter":          {},
 	"notifyblocks":          {},
 	"notifynewtransactions": {},
+	"notifyneworders":       {},
 	"notifyreceived":        {},
 	"notifyspent":           {},
 	"rescan":                {},

@@ -605,6 +605,13 @@ var helpDescsEnUS = map[string]string{
 	// StopNotifyNewTransactionsCmd help.
 	"stopnotifynewtransactions--synopsis": "Stop sending either a txaccepted or a txacceptedverbose notification when a new transaction is accepted into the mempool.",
 
+	// NotifyNewOrdersCmd help.
+	"notifyneworders--synopsis": "Send either a odraccepted or a odracceptedverbose notification when a new order is accepted into the membook.",
+	"notifyneworders-verbose":   "Specifies which type of notification to receive. If verbose is true, then the caller receives odracceptedverbose, otherwise the caller receives odraccepted",
+
+	// StopNotifyNewOrdersCmd help.
+	"stopnotifyneworders--synopsis": "Stop sending either a odraccepted or a odracceptedverbose notification when a new order is accepted into the membook.",
+
 	// NotifyReceivedCmd help.
 	"notifyreceived--synopsis": "Send a recvtx notification when a transaction added to mempool or appears in a newly-attached block contains a txout pkScript sending to any of the passed addresses.\n" +
 		"Matching outpoints are automatically registered for redeemingtx notifications.",
@@ -728,6 +735,8 @@ var rpcResultTypes = map[string][]interface{}{
 	"stopnotifyblocks":          nil,
 	"notifynewtransactions":     nil,
 	"stopnotifynewtransactions": nil,
+	"notifyneworders":           nil,
+	"stopnotifyneworders":       nil,
 	"notifyreceived":            nil,
 	"stopnotifyreceived":        nil,
 	"notifyspent":               nil,
