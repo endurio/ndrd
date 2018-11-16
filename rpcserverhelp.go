@@ -484,6 +484,23 @@ var helpDescsEnUS = map[string]string{
 	"getrawmempool--condition1": "verbose=true",
 	"getrawmempool--result0":    "Array of transaction hashes",
 
+	// GetRawMempoolVerboseResult help.
+	"getrawmembookverboseresult-size":             "Order size in bytes",
+	"getrawmembookverboseresult-fee":              "Order fee in bitcoins",
+	"getrawmembookverboseresult-time":             "Local time order entered pool in seconds since 1 Jan 1970 GMT",
+	"getrawmembookverboseresult-height":           "Block height when order entered the pool",
+	"getrawmembookverboseresult-startingpriority": "Priority when order entered the pool",
+	"getrawmembookverboseresult-currentpriority":  "Current priority",
+	"getrawmembookverboseresult-depends":          "Unconfirmed orders used as inputs for this order",
+	"getrawmembookverboseresult-vsize":            "The virtual size of a order",
+
+	// GetRawMempoolCmd help.
+	"getrawmembook--synopsis":   "Returns information about all of the orders currently in the memory pool.",
+	"getrawmembook-verbose":     "Returns JSON object when true or an array of order hashes when false",
+	"getrawmembook--condition0": "verbose=false",
+	"getrawmembook--condition1": "verbose=true",
+	"getrawmembook--result0":    "Array of order hashes",
+
 	// GetRawTransactionCmd help.
 	"getrawtransaction--synopsis":   "Returns information about a transaction given its hash.",
 	"getrawtransaction-txid":        "The hash of the transaction",
@@ -491,6 +508,14 @@ var helpDescsEnUS = map[string]string{
 	"getrawtransaction--condition0": "verbose=false",
 	"getrawtransaction--condition1": "verbose=true",
 	"getrawtransaction--result0":    "Hex-encoded bytes of the serialized transaction",
+
+	// GetRawOrderCmd help.
+	"getraworder--synopsis":   "Returns information about a order given its hash.",
+	"getraworder-odrid":       "The hash of the order",
+	"getraworder-verbose":     "Specifies the order is returned as a JSON object instead of a hex-encoded string",
+	"getraworder--condition0": "verbose=false",
+	"getraworder--condition1": "verbose=true",
+	"getraworder--result0":    "Hex-encoded bytes of the serialized order",
 
 	// GetTxOutResult help.
 	"gettxoutresult-bestblock":     "The block hash that contains the transaction output",
