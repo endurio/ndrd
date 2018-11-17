@@ -39,6 +39,25 @@ func (oD *OdrDesc) IsAsk() bool {
 	return oD.stb > 0
 }
 
+// Amount returns the NDR amount of the order
+func (oD *OdrDesc) Amount() float64 {
+	return btcutil.Amount(abs(oD.ndr)).ToBTC()
+}
+
+// Price returns the NDR/STB price of the order
+func (oD *OdrDesc) Price() float64 {
+	return -float64(oD.stb) / float64(oD.ndr)
+}
+
+// OrderBookResult returns OrderBookResult object for the order
+func (oD *OdrDesc) OrderBookResult() *btcjson.GetOrderBookResult {
+	return &btcjson.GetOrderBookResult{
+		Bid:    oD.IsBid(),
+		Price:  oD.Price(),
+		Amount: oD.Amount(),
+	}
+}
+
 // positive value means the token is being bought
 // negative value means the token is being sold
 func (oD *OdrDesc) calculateBalances(view *blockchain.UtxoViewpoint) error {
@@ -197,14 +216,14 @@ func insertOrder(orders *list.List, orderDesc *OdrDesc) *list.Element {
 	for ; e != nil; e = e.Next() {
 		o := e.Value.(*OdrDesc)
 		// TODO: check int64 overflow
-		if o.ndr*orderDesc.stb > orderDesc.ndr*o.stb {
+		if abs(o.stb)*orderDesc.ndr <= abs(orderDesc.stb)*o.ndr {
 			break
 		}
 	}
 	if e == nil {
 		return orders.PushBack(orderDesc)
 	}
-	return orders.InsertAfter(orderDesc, e)
+	return orders.InsertBefore(orderDesc, e)
 }
 
 // addOrder adds the passed odr to the memory pool.  It should
@@ -611,6 +630,57 @@ func (ob *OdrBook) RawMembookVerbose() map[string]*btcjson.GetRawMembookVerboseR
 	return result
 }
 
+// not thread safe
+func getOrdersForDepth(orders *list.List, depth float64) []*OdrDesc {
+	result := make([]*OdrDesc, 0, orders.Len())
+
+	var total float64
+
+	for e := orders.Front(); e != nil; e = e.Next() {
+		odrDesc := e.Value.(*OdrDesc)
+		result = append(result, odrDesc)
+
+		// limit the list by market depth param
+		if depth > 0 {
+			total += odrDesc.Amount()
+			if total >= depth {
+				return result
+			}
+		}
+	}
+
+	return result
+}
+
+// OrderBook returns all of the entries in the order book as a fully
+// populated btcjson result.
+//
+// This function is safe for concurrent access.
+func (ob *OdrBook) OrderBook(depth float64) ([]*btcjson.GetOrderBookResult, error) {
+	ob.mtx.RLock()
+	defer ob.mtx.RUnlock()
+
+	asks := getOrdersForDepth(ob.asks, depth)
+	bids := getOrdersForDepth(ob.bids, depth)
+
+	result := make([]*btcjson.GetOrderBookResult, len(asks)+len(bids))
+
+	var idx int
+	// asks list is reverted
+	for i := len(asks) - 1; i >= 0; i-- {
+		odrDesc := asks[i]
+		result[idx] = odrDesc.OrderBookResult()
+		idx++
+	}
+
+	for _, odrDesc := range bids {
+		result[idx] = odrDesc.OrderBookResult()
+		idx++
+	}
+
+	return result, nil
+}
+
 // LastUpdated returns the last time a order was added to or removed from
 // the main book.  It does not include the orphan pool.
 //
@@ -629,4 +699,11 @@ func NewMemBook(cfg *Config) *OdrBook {
 		asks:      list.New(),
 		outpoints: make(map[wire.OutPoint]*list.Element),
 	}
+}
+
+func abs(a int64) int64 {
+	if a < 0 {
+		return -a
+	}
+	return a
 }

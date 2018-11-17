@@ -282,6 +282,15 @@ type GetRawMembookVerboseResult struct {
 	Depends []string `json:"depends"`
 }
 
+// GetOrderBookResult models the data returned from the getrawmembook
+// command when the verbose flag is set.  When the verbose flag is not set,
+// getrawmembook returns an array of order hashes.
+type GetOrderBookResult struct {
+	Bid    bool    `json:"bid"`
+	Price  float64 `json:"price"`
+	Amount float64 `json:"amount"`
+}
+
 // ScriptPubKeyResult models the scriptPubKey data of a tx script.  It is
 // defined separately since it is used by multiple commands.
 type ScriptPubKeyResult struct {

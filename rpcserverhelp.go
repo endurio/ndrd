@@ -501,6 +501,11 @@ var helpDescsEnUS = map[string]string{
 	"getrawmembook--condition1": "verbose=true",
 	"getrawmembook--result0":    "Array of order hashes",
 
+	// GetRawMempoolCmd help.
+	"getorderbook--synopsis": "Returns information about all of the transactions currently in the memory pool.",
+	"getorderbook-depth":     "Market depth of the orders from both side",
+	"getorderbook--result0":  "Array of orders",
+
 	// GetRawTransactionCmd help.
 	"getrawtransaction--synopsis":   "Returns information about a transaction given its hash.",
 	"getrawtransaction-txid":        "The hash of the transaction",
@@ -737,6 +742,8 @@ var rpcResultTypes = map[string][]interface{}{
 	"getnetworkhashps":      {(*int64)(nil)},
 	"getpeerinfo":           {(*[]btcjson.GetPeerInfoResult)(nil)},
 	"getrawmempool":         {(*[]string)(nil), (*btcjson.GetRawMempoolVerboseResult)(nil)},
+	"getrawmembook":         {(*[]string)(nil), (*btcjson.GetRawMembookVerboseResult)(nil)},
+	"getorderbook":          {(*[]string)(nil), (*btcjson.GetOrderBookResult)(nil)},
 	"getrawtransaction":     {(*string)(nil), (*btcjson.TxRawResult)(nil)},
 	"gettxout":              {(*btcjson.GetTxOutResult)(nil)},
 	"node":                  nil,

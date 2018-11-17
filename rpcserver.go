@@ -159,6 +159,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"getpeerinfo":           handleGetPeerInfo,
 	"getrawmempool":         handleGetRawMempool,
 	"getrawmembook":         handleGetRawMembook,
+	"getorderbook":          handleGetOrderBook,
 	"getrawtransaction":     handleGetRawTransaction,
 	"getraworder":           handleGetRawOrder,
 	"gettxout":              handleGetTxOut,
@@ -275,6 +276,7 @@ var rpcLimited = map[string]struct{}{
 	"getnetworkhashps":      {},
 	"getrawmempool":         {},
 	"getrawmembook":         {},
+	"getorderbook":          {},
 	"getrawtransaction":     {},
 	"getraworder":           {},
 	"gettxout":              {},
@@ -2615,6 +2617,19 @@ func handleGetRawMembook(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	}
 
 	return hashStrings, nil
+}
+
+// handleGetOrderBook implements the getrawOrderBook command.
+func handleGetOrderBook(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.GetOrderBookCmd)
+	mb := s.cfg.OdrMemBook
+	var depth float64
+
+	if c.Depth != nil && *c.Depth > 0.0 {
+		depth = *c.Depth
+	}
+
+	return mb.OrderBook(depth)
 }
 
 // handleGetRawTransaction implements the getrawtransaction command.

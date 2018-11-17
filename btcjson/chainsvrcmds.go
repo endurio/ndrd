@@ -474,6 +474,22 @@ func NewGetRawMembookCmd(verbose *bool) *GetRawMembookCmd {
 	}
 }
 
+// GetOrderBookCmd defines the getmempool JSON-RPC command.
+type GetOrderBookCmd struct {
+	Depth *float64 `jsonrpcdefault:"0"`
+}
+
+// NewGetOrderBookCmd returns a new instance which can be used to issue a
+// getorderbook JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewGetOrderBookCmd(depth *float64) *GetOrderBookCmd {
+	return &GetOrderBookCmd{
+		Depth: depth,
+	}
+}
+
 // GetRawTransactionCmd defines the getrawtransaction JSON-RPC command.
 //
 // NOTE: This field is an int versus a bool to remain compatible with Bitcoin
@@ -861,6 +877,7 @@ func init() {
 	MustRegisterCmd("getpeerinfo", (*GetPeerInfoCmd)(nil), flags)
 	MustRegisterCmd("getrawmempool", (*GetRawMempoolCmd)(nil), flags)
 	MustRegisterCmd("getrawmembook", (*GetRawMembookCmd)(nil), flags)
+	MustRegisterCmd("getorderbook", (*GetOrderBookCmd)(nil), flags)
 	MustRegisterCmd("getrawtransaction", (*GetRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("getraworder", (*GetRawOrderCmd)(nil), flags)
 	MustRegisterCmd("gettxout", (*GetTxOutCmd)(nil), flags)
