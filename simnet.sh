@@ -60,21 +60,25 @@ if [[ $trace -ne 0 ]]; then
 	BTCW="$BTCW --debuglevel=trace"
 fi
 
+START="start"
+
 if [[ $daemon -ne 0 ]]; then
-	start $BTCD
+	$START $BTCD
 
 	if [[ $first -ne 0 ]]; then
-		start $BTCW --appdata="$LOCALAPPDATA/btcwallet"
+		$START $BTCW --appdata="$LOCALAPPDATA/btcwallet"
 		sleep 5
 		WALLET_ADDR=`$CTLW getnewaddress`
 		taskkill -IM btcwallet.exe
 
-		start $BTCW --appdata="$LOCALAPPDATA/btcwalletTMP"
+		$START $BTCW --appdata="$LOCALAPPDATA/btcwalletTMP"
 		sleep 5
 		$CTLW walletpassphrase "password" 0
 		$CTLW importprivkey $MINING_SKEY
-		$CTLW sendfrom imported $WALLET_ADDR 4 NDR
-		$CTLW sendfrom imported $WALLET_ADDR 6 STB
+
+		ACC=imported
+		$CTLW sendfrom $ACC $WALLET_ADDR 6 NDR
+		$CTLW sendfrom $ACC $WALLET_ADDR 13 STB
 		$CTL generate 1
 		taskkill -IM btcwallet.exe
 	fi
@@ -82,7 +86,22 @@ fi
 
 if [[ $wallet -ne 0 ]]; then
 	sleep 2
-	start $BTCW --appdata="$LOCALAPPDATA/btcwallet"
+	$START $BTCW --appdata="$LOCALAPPDATA/btcwallet"
 	sleep 5
 	$CTLW walletpassphrase "password" 0
+
+	aa=""
+	bb=""
+	for i in {0..10}; do
+		aa="$aa\"`$CTLW getnewaddress`\":0.$((RANDOM%3+3)),"
+		bb="$bb\"`$CTLW getnewaddress`\":0.$((RANDOM%3+3)),"
+	done
+	$CTLW sendmany default {${aa::-1}} NDR
+	$CTLW sendmany default {${bb::-1}} STB
+	$CTL generate 1
+
+	for i in {0..5}; do
+		$CTLW ask 0.$((RANDOM%5))$((RANDOM%9+1)) 2.$((RANDOM%2))$((RANDOM%10))
+		$CTLW bid 0.$((RANDOM%5))$((RANDOM%9+1)) 1.$((RANDOM%2+8))$((RANDOM%10))
+	done
 fi
