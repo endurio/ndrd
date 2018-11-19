@@ -39,6 +39,19 @@ shift $((OPTIND-1))
 MINING_ADDR=ame7CaXCbBV4YvpLUX3fNsGSd7y3ryBfKf
 MINING_SKEY=Fw28Hpjon65S4XT8uyfh7w7UFxWVExTs8oDyQZXwB1fTgwwzxnVY
 
+# command shortcuts
+START="start"
+CTL="ndrctl --simnet --rpcuser=a --rpcpass=a --skipverify"
+CTLW="$CTL --wallet"
+BTCD="btcd --simnet --rpcuser=a --rpcpass=a --miningkey=$MINING_SKEY"
+BTCW="btcwallet --simnet --connect=localhost --username=a --password=a --createtemp"
+
+# stop running daemon
+if [[ $wallet -ne 0 ]]; then
+	$CTLW stop 2>/dev/null | grep stopping && sleep 3s
+fi
+$CTL stop 2>/dev/null | grep stopping && sleep 3s
+
 # process OPTs
 if [[ $remove -ne 0 ]]; then
 	rm -rf "$LOCALAPPDATA/btcd/data/simnet"
@@ -49,18 +62,10 @@ fi
 rm -rf "$LOCALAPPDATA/btcwalletTMP/simnet"
 rm -rf "$LOCALAPPDATA/btcwalletTMP/logs/simnet"
 
-CTL="ndrctl --simnet --rpcuser=a --rpcpass=a --skipverify"
-CTLW="$CTL --wallet"
-
-BTCD="btcd --simnet --rpcuser=a --rpcpass=a --miningkey=$MINING_SKEY"
-BTCW="btcwallet --simnet --connect=localhost --username=a --password=a --createtemp"
-
 if [[ $trace -ne 0 ]]; then
 	BTCD="$BTCD --debuglevel=trace"
 	BTCW="$BTCW --debuglevel=trace"
 fi
-
-START="start"
 
 if [[ $daemon -ne 0 ]]; then
 	$START $BTCD
@@ -69,7 +74,7 @@ if [[ $daemon -ne 0 ]]; then
 		$START $BTCW --appdata="$LOCALAPPDATA/btcwallet"
 		sleep 5
 		WALLET_ADDR=`$CTLW getnewaddress`
-		taskkill -IM btcwallet.exe
+		$CTLW stop
 
 		$START $BTCW --appdata="$LOCALAPPDATA/btcwalletTMP"
 		sleep 5
@@ -80,7 +85,7 @@ if [[ $daemon -ne 0 ]]; then
 		$CTLW sendfrom $ACC $WALLET_ADDR 6 NDR
 		$CTLW sendfrom $ACC $WALLET_ADDR 13 STB
 		$CTL generate 1
-		taskkill -IM btcwallet.exe
+		$CTLW stop
 	fi
 fi
 
