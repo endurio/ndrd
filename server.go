@@ -229,6 +229,7 @@ type server struct {
 	nat                  NAT
 	db                   database.DB
 	timeSource           blockchain.MedianTimeSource
+	priceSource          blockchain.FeedPriceSource
 	services             wire.ServiceFlag
 
 	// The following fields are used for optional indexes.  They will be nil
@@ -2788,6 +2789,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		nat:                  nat,
 		db:                   db,
 		timeSource:           blockchain.NewMedianTime(),
+		priceSource:          blockchain.NewFeedPrice(chainParams.TargetTimePerBlock),
 		services:             services,
 		sigCache:             txscript.NewSigCache(cfg.SigCacheMaxSize),
 		hashCache:            txscript.NewHashCache(cfg.SigCacheMaxSize),
@@ -2940,7 +2942,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	}
 	blockTemplateGenerator := mining.NewBlkTmplGenerator(&policy,
 		s.chainParams, s.txMemPool, s.chain, s.timeSource,
-		s.sigCache, s.hashCache)
+		s.priceSource, s.sigCache, s.hashCache)
 	s.cpuMiner = cpuminer.New(&cpuminer.Config{
 		ChainParams:            chainParams,
 		BlockTemplateGenerator: blockTemplateGenerator,
@@ -3051,6 +3053,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 			ConnMgr:      &rpcConnManager{&s},
 			SyncMgr:      &rpcSyncMgr{&s, s.syncManager},
 			TimeSource:   s.timeSource,
+			PriceSource:  s.priceSource,
 			Chain:        s.chain,
 			ChainParams:  chainParams,
 			DB:           db,

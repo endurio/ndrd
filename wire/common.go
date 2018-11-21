@@ -126,6 +126,24 @@ func (l binaryFreeList) Uint64(r io.Reader, byteOrder binary.ByteOrder) (uint64,
 	return rv, nil
 }
 
+// Float32 reads four bytes from the provided reader using a buffer from the
+// free list, converts it to a number using the provided byte order, and returns
+// the resulting float32.
+func (l binaryFreeList) Float32(r io.Reader, byteOrder binary.ByteOrder) (float32, error) {
+	var rv float32
+	err := binary.Read(r, byteOrder, &rv)
+	return rv, err
+}
+
+// Float64 reads eight bytes from the provided reader using a buffer from the
+// free list, converts it to a number using the provided byte order, and returns
+// the resulting float64.
+func (l binaryFreeList) Float64(r io.Reader, byteOrder binary.ByteOrder) (float64, error) {
+	var rv float64
+	err := binary.Read(r, byteOrder, &rv)
+	return rv, err
+}
+
 // PutUint8 copies the provided uint8 into a buffer from the free list and
 // writes the resulting byte to the given writer.
 func (l binaryFreeList) PutUint8(w io.Writer, val uint8) error {
@@ -167,6 +185,20 @@ func (l binaryFreeList) PutUint64(w io.Writer, byteOrder binary.ByteOrder, val u
 	_, err := w.Write(buf)
 	l.Return(buf)
 	return err
+}
+
+// PutFloat32 serializes the provided float32 using the given byte order into a
+// buffer from the free list and writes the resulting four bytes to the given
+// writer.
+func (l binaryFreeList) PutFloat32(w io.Writer, byteOrder binary.ByteOrder, val float32) error {
+	return binary.Write(w, byteOrder, val)
+}
+
+// PutFloat64 serializes the provided float64 using the given byte order into a
+// buffer from the free list and writes the resulting eight bytes to the given
+// writer.
+func (l binaryFreeList) PutFloat64(w io.Writer, byteOrder binary.ByteOrder, val float64) error {
+	return binary.Write(w, byteOrder, val)
 }
 
 // binarySerializer provides a free list of buffers to use for serializing and
@@ -220,6 +252,22 @@ func readElement(r io.Reader, element interface{}) error {
 
 	case *uint64:
 		rv, err := binarySerializer.Uint64(r, littleEndian)
+		if err != nil {
+			return err
+		}
+		*e = rv
+		return nil
+
+	case *float32:
+		rv, err := binarySerializer.Float32(r, littleEndian)
+		if err != nil {
+			return err
+		}
+		*e = rv
+		return nil
+
+	case *float64:
+		rv, err := binarySerializer.Float64(r, littleEndian)
 		if err != nil {
 			return err
 		}
@@ -380,6 +428,20 @@ func writeElement(w io.Writer, element interface{}) error {
 
 	case uint64:
 		err := binarySerializer.PutUint64(w, littleEndian, e)
+		if err != nil {
+			return err
+		}
+		return nil
+
+	case float32:
+		err := binarySerializer.PutFloat32(w, littleEndian, e)
+		if err != nil {
+			return err
+		}
+		return nil
+
+	case float64:
+		err := binarySerializer.PutFloat64(w, littleEndian, e)
 		if err != nil {
 			return err
 		}

@@ -362,6 +362,7 @@ type BlkTmplGenerator struct {
 	txSource    TxSource
 	chain       *blockchain.BlockChain
 	timeSource  blockchain.MedianTimeSource
+	priceSource blockchain.FeedPriceSource
 	sigCache    *txscript.SigCache
 	hashCache   *txscript.HashCache
 }
@@ -375,6 +376,7 @@ type BlkTmplGenerator struct {
 func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 	txSource TxSource, chain *blockchain.BlockChain,
 	timeSource blockchain.MedianTimeSource,
+	priceSource blockchain.FeedPriceSource,
 	sigCache *txscript.SigCache,
 	hashCache *txscript.HashCache) *BlkTmplGenerator {
 
@@ -384,6 +386,7 @@ func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 		txSource:    txSource,
 		chain:       chain,
 		timeSource:  timeSource,
+		priceSource: priceSource,
 		sigCache:    sigCache,
 		hashCache:   hashCache,
 	}
@@ -870,11 +873,12 @@ mempoolLoop:
 	merkles := blockchain.BuildMerkleTreeStore(blockTxns, false)
 	var msgBlock wire.MsgBlock
 	msgBlock.Header = wire.BlockHeader{
-		Version:    nextBlockVersion,
-		PrevBlock:  best.Hash,
-		MerkleRoot: *merkles[len(merkles)-1],
-		Timestamp:  ts,
-		Bits:       reqDifficulty,
+		Version:         nextBlockVersion,
+		PrevBlock:       best.Hash,
+		MerkleRoot:      *merkles[len(merkles)-1],
+		Timestamp:       ts,
+		Bits:            reqDifficulty,
+		PriceDerivation: float64(g.priceSource.PriceToMine()),
 	}
 	for _, tx := range blockTxns {
 		if err := msgBlock.AddTransaction(tx.MsgTx()); err != nil {

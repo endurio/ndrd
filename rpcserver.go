@@ -134,6 +134,7 @@ var rpcHandlersBeforeInit = map[string]commandHandler{
 	"decodescript":          handleDecodeScript,
 	"estimatefee":           handleEstimateFee,
 	"generate":              handleGenerate,
+	"feedprice":             handleFeedPrice,
 	"getaddednodeinfo":      handleGetAddedNodeInfo,
 	"getbestblock":          handleGetBestBlock,
 	"getbestblockhash":      handleGetBestBlockHash,
@@ -344,14 +345,16 @@ type gbtWorkState struct {
 	template      *mining.BlockTemplate
 	notifyMap     map[chainhash.Hash]map[int64]chan struct{}
 	timeSource    blockchain.MedianTimeSource
+	priceSource   blockchain.FeedPriceSource
 }
 
 // newGbtWorkState returns a new instance of a gbtWorkState with all internal
 // fields initialized and ready to use.
-func newGbtWorkState(timeSource blockchain.MedianTimeSource) *gbtWorkState {
+func newGbtWorkState(timeSource blockchain.MedianTimeSource, priceSource blockchain.FeedPriceSource) *gbtWorkState {
 	return &gbtWorkState{
-		notifyMap:  make(map[chainhash.Hash]map[int64]chan struct{}),
-		timeSource: timeSource,
+		notifyMap:   make(map[chainhash.Hash]map[int64]chan struct{}),
+		timeSource:  timeSource,
+		priceSource: priceSource,
 	}
 }
 
@@ -3650,6 +3653,23 @@ func handleSetGenerate(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 	return nil, nil
 }
 
+// handleFeedPrice implements the feedprice command.
+func handleFeedPrice(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
+	c := cmd.(*btcjson.FeedPriceCmd)
+
+	price := c.Price
+
+	if price <= 0 {
+		return nil, &btcjson.RPCError{
+			Code:    btcjson.ErrRPCInvalidRequest.Code,
+			Message: "Price must be possitive",
+		}
+	}
+
+	s.cfg.PriceSource.FeedPrice(blockchain.Price(price))
+	return nil, nil
+}
+
 // handleStop implements the stop command.
 func handleStop(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (interface{}, error) {
 	select {
@@ -4506,6 +4526,7 @@ type rpcserverConfig struct {
 	// These fields allow the RPC server to interface with the local block
 	// chain data and state.
 	TimeSource  blockchain.MedianTimeSource
+	PriceSource blockchain.FeedPriceSource
 	Chain       *blockchain.BlockChain
 	ChainParams *chaincfg.Params
 	DB          database.DB
@@ -4539,7 +4560,7 @@ func newRPCServer(config *rpcserverConfig) (*rpcServer, error) {
 	rpc := rpcServer{
 		cfg:                    *config,
 		statusLines:            make(map[int]string),
-		gbtWorkState:           newGbtWorkState(config.TimeSource),
+		gbtWorkState:           newGbtWorkState(config.TimeSource, config.PriceSource),
 		helpCacher:             newHelpCacher(),
 		requestProcessShutdown: make(chan struct{}),
 		quit: make(chan int),

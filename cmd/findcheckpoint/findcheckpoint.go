@@ -154,6 +154,7 @@ func main() {
 		DB:          db,
 		ChainParams: activeNetParams,
 		TimeSource:  blockchain.NewMedianTime(),
+		PriceSource: blockchain.NewFeedPrice(activeNetParams.TargetTimePerBlock),
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to initialize chain: %v\n", err)

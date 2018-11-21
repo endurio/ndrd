@@ -1686,6 +1686,9 @@ type Config struct {
 	// time is adjusted to be in agreement with other peers.
 	TimeSource MedianTimeSource
 
+	// PriceSource defines the price source fed from outside of the network.
+	PriceSource FeedPriceSource
+
 	// SigCache defines a signature cache to use when when validating
 	// signatures.  This is typically most useful when individual
 	// transactions are already being validated prior to their inclusion in

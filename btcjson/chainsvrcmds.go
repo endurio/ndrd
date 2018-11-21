@@ -741,6 +741,22 @@ func NewSetGenerateCmd(generate bool, genProcLimit *int) *SetGenerateCmd {
 	}
 }
 
+// FeedPriceCmd defines the feedprice JSON-RPC command.
+type FeedPriceCmd struct {
+	Price float64
+}
+
+// NewFeedPriceCmd returns a new instance which can be used to issue a
+// feedprice JSON-RPC command.
+//
+// The parameters which are pointers indicate they are optional.  Passing nil
+// for optional parameters will use the default value.
+func NewFeedPriceCmd(price float64) *FeedPriceCmd {
+	return &FeedPriceCmd{
+		Price: price,
+	}
+}
+
 // StopCmd defines the stop JSON-RPC command.
 type StopCmd struct{}
 
@@ -852,6 +868,7 @@ func init() {
 	MustRegisterCmd("createrawtransaction", (*CreateRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("decoderawtransaction", (*DecodeRawTransactionCmd)(nil), flags)
 	MustRegisterCmd("decodescript", (*DecodeScriptCmd)(nil), flags)
+	MustRegisterCmd("feedprice", (*FeedPriceCmd)(nil), flags)
 	MustRegisterCmd("getaddednodeinfo", (*GetAddedNodeInfoCmd)(nil), flags)
 	MustRegisterCmd("getbestblockhash", (*GetBestBlockHashCmd)(nil), flags)
 	MustRegisterCmd("getblock", (*GetBlockCmd)(nil), flags)

@@ -334,6 +334,7 @@ func newBlockImporter(db database.DB, r io.ReadSeeker) (*blockImporter, error) {
 		DB:           db,
 		ChainParams:  activeNetParams,
 		TimeSource:   blockchain.NewMedianTime(),
+		PriceSource:  blockchain.NewFeedPrice(activeNetParams.TargetTimePerBlock),
 		IndexManager: indexManager,
 	})
 	if err != nil {
