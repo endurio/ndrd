@@ -24,29 +24,27 @@ import (
 // additional metadata.
 type OdrDesc struct {
 	*btcutil.Odr
-
-	stb int64
-	ndr int64
+	balances map[wire.TokenIdentity]int64
 }
 
 // IsBid returns whether an order is a bid (buying NDR)
 func (oD *OdrDesc) IsBid() bool {
-	return oD.ndr > 0
+	return oD.balances[wire.NDR] < 0
 }
 
 // IsAsk return whether an order is an ask (selling NDR)
 func (oD *OdrDesc) IsAsk() bool {
-	return oD.stb > 0
+	return oD.balances[wire.STB] < 0
 }
 
 // Amount returns the NDR amount of the order
 func (oD *OdrDesc) Amount() float64 {
-	return btcutil.Amount(abs(oD.ndr)).ToBTC()
+	return btcutil.Amount(abs(oD.balances[wire.NDR])).ToBTC()
 }
 
 // Price returns the NDR/STB price of the order
 func (oD *OdrDesc) Price() float64 {
-	return -float64(oD.stb) / float64(oD.ndr)
+	return -float64(oD.balances[wire.STB]) / float64(oD.balances[wire.NDR])
 }
 
 // OrderBookResult returns OrderBookResult object for the order
@@ -56,40 +54,6 @@ func (oD *OdrDesc) OrderBookResult() *btcjson.GetOrderBookResult {
 		Price:  oD.Price(),
 		Amount: oD.Amount(),
 	}
-}
-
-// positive value means the token is being bought
-// negative value means the token is being sold
-func (oD *OdrDesc) calculateBalances(view *blockchain.UtxoViewpoint) error {
-	if oD.stb != 0 || oD.ndr != 0 {
-		return nil
-	}
-	for _, txIn := range oD.TxIn {
-		utxoEntry := view.LookupEntry(txIn.PreviousOutPoint)
-		if utxoEntry == nil {
-			str := fmt.Sprintf("input %v for order %v not exists",
-				txIn.PreviousOutPoint, oD.Hash())
-			return txRuleError(wire.RejectInvalid, str)
-		}
-		if utxoEntry.TokenID() == wire.NDR {
-			oD.ndr -= utxoEntry.Amount()
-		} else {
-			oD.stb -= utxoEntry.Amount()
-		}
-	}
-	for _, txOut := range oD.TxOut {
-		if txOut.TokenID() == wire.NDR {
-			oD.ndr += txOut.Value
-		} else {
-			oD.stb += txOut.Value
-		}
-	}
-	if oD.stb^oD.ndr > 0 {
-		str := fmt.Sprintf("balances (%v, %v) must be opposite for order %v",
-			oD.stb, oD.ndr, oD.Hash())
-		return txRuleError(wire.RejectInvalid, str)
-	}
-	return nil
 }
 
 // OdrBook ...
@@ -216,7 +180,8 @@ func insertOrder(orders *list.List, orderDesc *OdrDesc) *list.Element {
 	for ; e != nil; e = e.Next() {
 		o := e.Value.(*OdrDesc)
 		// TODO: check int64 overflow
-		if abs(o.stb)*orderDesc.ndr <= abs(orderDesc.stb)*o.ndr {
+		if abs(o.balances[wire.STB])*orderDesc.balances[wire.NDR] >=
+			abs(orderDesc.balances[wire.STB])*o.balances[wire.NDR] {
 			break
 		}
 	}
@@ -231,13 +196,12 @@ func insertOrder(orders *list.List, orderDesc *OdrDesc) *list.Element {
 // helper for maybeAcceptOrder.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (ob *OdrBook) addOrder(utxoView *blockchain.UtxoViewpoint, odr *btcutil.Odr, height int32) *OdrDesc {
+func (ob *OdrBook) addOrder(odr *btcutil.Odr,
+	balances map[wire.TokenIdentity]int64, height int32) *OdrDesc {
+
 	odrDesc := &OdrDesc{
-		Odr: odr,
-	}
-	err := odrDesc.calculateBalances(utxoView)
-	if err != nil {
-		return nil
+		Odr:      odr,
+		balances: balances,
 	}
 
 	var element *list.Element
@@ -434,13 +398,21 @@ func (ob *OdrBook) maybeAcceptOrder(order *btcutil.Odr) (*OdrDesc, error) {
 	// rules in blockchain for what transactions are allowed into blocks.
 	// Also returns the fees associated with the transaction which will be
 	// used later.
-	_, _, err = blockchain.CheckOrderInputs(order, nextBlockHeight,
+	balances, err := blockchain.CheckTransactionInputs(order.Tx, nextBlockHeight,
 		utxoView, ob.cfg.ChainParams)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
 			return nil, chainRuleError(cerr)
 		}
 		return nil, err
+	}
+
+	if balances[wire.STB] >= 0 && balances[wire.NDR] >= 0 {
+		str := fmt.Sprintf("Not an order: %v", txHash)
+		return nil, blockchain.RuleError{
+			ErrorCode:   blockchain.ErrNotAnOrder,
+			Description: str,
+		}
 	}
 
 	// Don't allow transactions with non-standard inputs if the network
@@ -497,7 +469,7 @@ func (ob *OdrBook) maybeAcceptOrder(order *btcutil.Odr) (*OdrDesc, error) {
 	}
 
 	// Add to transaction pool.
-	oD := ob.addOrder(utxoView, order, bestHeight)
+	oD := ob.addOrder(order, balances, bestHeight)
 
 	log.Debugf("Accepted order %v (book size: %v)", txHash, len(ob.book))
 

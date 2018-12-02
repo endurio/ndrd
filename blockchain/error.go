@@ -226,6 +226,9 @@ const (
 
 	// ErrUnauthorizedMiner indicates the miner public key is not authorized.
 	ErrUnauthorizedMiner
+
+	// ErrNotAnOrder indicates the object is actually not and order.
+	ErrNotAnOrder
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.

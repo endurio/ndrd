@@ -789,7 +789,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejec
 	// rules in blockchain for what transactions are allowed into blocks.
 	// Also returns the fees associated with the transaction which will be
 	// used later.
-	txFee, err := blockchain.CheckTransactionInputs(tx, nextBlockHeight,
+	balances, err := blockchain.CheckTransactionInputs(tx, nextBlockHeight,
 		utxoView, mp.cfg.ChainParams)
 	if err != nil {
 		if cerr, ok := err.(blockchain.RuleError); ok {
@@ -797,6 +797,15 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejec
 		}
 		return nil, nil, err
 	}
+
+	if balances[wire.STB] < 0 || balances[wire.NDR] < 0 {
+		// it's an Order, wrong function to call
+		return nil, nil, txRuleError(wire.RejectInvalid,
+			"object is an order, not a transaction")
+	}
+
+	// TODO: estimate the total fee using NDR/STB rate
+	txFee := balances[wire.STB] + balances[wire.NDR]
 
 	// Don't allow transactions with non-standard inputs if the network
 	// parameters forbid their acceptance.

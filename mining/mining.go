@@ -753,7 +753,7 @@ mempoolLoop:
 
 		// Ensure the transaction inputs pass all of the necessary
 		// preconditions before allowing it to be added to the block.
-		_, err = blockchain.CheckTransactionInputs(tx, nextBlockHeight,
+		balances, err := blockchain.CheckTransactionInputs(tx, nextBlockHeight,
 			blockUtxos, g.chainParams)
 		if err != nil {
 			log.Tracef("Skipping tx %s due to error in "+
@@ -761,6 +761,20 @@ mempoolLoop:
 			logSkippedDeps(tx, deps)
 			continue
 		}
+
+		for token, balance := range balances {
+			if balance < 0 {
+				// it's an order, not belong here
+				str := fmt.Sprintf("total %v value of all transaction inputs for "+
+					"transaction %v is less than the amount spent. Or perhaps it "+
+					"is an order instead.", token, tx.Hash())
+				return nil, blockchain.RuleError{
+					ErrorCode:   blockchain.ErrSpendTooHigh,
+					Description: str,
+				}
+			}
+		}
+
 		err = blockchain.ValidateTransactionScripts(tx, blockUtxos,
 			txscript.StandardVerifyFlags, g.sigCache,
 			g.hashCache)
