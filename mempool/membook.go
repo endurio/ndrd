@@ -7,6 +7,7 @@ package mempool
 import (
 	"container/list"
 	"fmt"
+	"math/big"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -179,9 +180,13 @@ func insertOrder(orders *list.List, orderDesc *OdrDesc) *list.Element {
 	e := orders.Front()
 	for ; e != nil; e = e.Next() {
 		o := e.Value.(*OdrDesc)
-		// TODO: check int64 overflow
-		if abs(o.balances[wire.STB])*orderDesc.balances[wire.NDR] >=
-			abs(orderDesc.balances[wire.STB])*o.balances[wire.NDR] {
+
+		// comparing (orderDesc.stb / orderDesc.ndr) <= (o.stb / o.ndr)
+		a := big.NewInt(orderDesc.balances[wire.STB])
+		a = a.Mul(a, big.NewInt(o.balances[wire.NDR]))
+		b := big.NewInt(o.balances[wire.STB])
+		b = b.Mul(b, big.NewInt(orderDesc.balances[wire.NDR]))
+		if a.Cmp(b) <= 0 {
 			break
 		}
 	}
@@ -638,13 +643,10 @@ func (ob *OdrBook) OrderBook(depth float64) ([]*btcjson.GetOrderBookResult, erro
 	result := make([]*btcjson.GetOrderBookResult, len(asks)+len(bids))
 
 	var idx int
-	// asks list is reverted
-	for i := len(asks) - 1; i >= 0; i-- {
-		odrDesc := asks[i]
+	for _, odrDesc := range asks {
 		result[idx] = odrDesc.OrderBookResult()
 		idx++
 	}
-
 	for _, odrDesc := range bids {
 		result[idx] = odrDesc.OrderBookResult()
 		idx++
