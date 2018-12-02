@@ -95,13 +95,14 @@ type blockNode struct {
 	timestamp  int64
 	merkleRoot chainhash.Hash
 
+	priceDerivation Price
+	signature       btcec.CompactSignature
+
 	// status is a bitfield representing the validation state of the block. The
 	// status field, unlike the other fields, may be written to and so should
 	// only be accessed using the concurrent-safe NodeStatus method on
 	// blockIndex once the node has been added to the global index.
 	status blockStatus
-
-	signature btcec.CompactSignature
 }
 
 // initBlockNode initializes a block node from the given header and parent node,
@@ -110,14 +111,15 @@ type blockNode struct {
 // initially creating a node.
 func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *blockNode) {
 	*node = blockNode{
-		hash:       blockHeader.BlockHash(),
-		workSum:    CalcWork(blockHeader.Bits),
-		version:    blockHeader.Version,
-		bits:       blockHeader.Bits,
-		nonce:      blockHeader.Nonce,
-		timestamp:  blockHeader.Timestamp.Unix(),
-		merkleRoot: blockHeader.MerkleRoot,
-		signature:  blockHeader.Signature,
+		hash:            blockHeader.BlockHash(),
+		workSum:         CalcWork(blockHeader.Bits),
+		version:         blockHeader.Version,
+		bits:            blockHeader.Bits,
+		nonce:           blockHeader.Nonce,
+		timestamp:       blockHeader.Timestamp.Unix(),
+		merkleRoot:      blockHeader.MerkleRoot,
+		priceDerivation: Price(blockHeader.PriceDerivation),
+		signature:       blockHeader.Signature,
 	}
 	if parent != nil {
 		node.parent = parent
@@ -145,13 +147,14 @@ func (node *blockNode) Header() wire.BlockHeader {
 		prevHash = &node.parent.hash
 	}
 	return wire.BlockHeader{
-		Version:    node.version,
-		PrevBlock:  *prevHash,
-		MerkleRoot: node.merkleRoot,
-		Timestamp:  time.Unix(node.timestamp, 0),
-		Bits:       node.bits,
-		Nonce:      node.nonce,
-		Signature:  node.signature,
+		Version:         node.version,
+		PrevBlock:       *prevHash,
+		MerkleRoot:      node.merkleRoot,
+		Timestamp:       time.Unix(node.timestamp, 0),
+		Bits:            node.bits,
+		Nonce:           node.nonce,
+		PriceDerivation: float64(node.priceDerivation),
+		Signature:       node.signature,
 	}
 }
 
