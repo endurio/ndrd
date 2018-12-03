@@ -33,7 +33,7 @@ func (oD *OdrDesc) OrderBookResult() *btcjson.GetOrderBookResult {
 	return &btcjson.GetOrderBookResult{
 		Bid:    oD.Bid,
 		Price:  oD.Price,
-		Amount: oD.Amount.ToBTC(),
+		Amount: oD.Payout.ToBTC() / oD.Price,
 	}
 }
 
@@ -194,7 +194,7 @@ func (ob *OdrBook) addOrder(odr *btcutil.Odr, stb, ndr int64, height int32) *Odr
 			Added:  time.Now(),
 			Height: height,
 			Bid:    ndr > 0,
-			Amount: btcutil.Amount(abs(ndr)),
+			Payout: btcutil.Amount(abs(stb)),
 			Price:  float64(abs(stb)) / float64(abs(ndr)),
 		},
 	}
@@ -560,22 +560,22 @@ func (ob *OdrBook) OdrDescs() []*OdrDesc {
 	return descs
 }
 
-// MiningDescs returns a slice of mining descriptors for all the orders
-// in the pool.
+// MiningDescs returns a slice of mining descriptors for the orders
+// in the book, to spend as much as possible the amount of STB.
 //
 // This is part of the mining.OdrSource interface implementation and is safe for
 // concurrent access as required by the interface contract.
-func (ob *OdrBook) MiningDescs(amount *big.Int) []*mining.OdrDesc {
+func (ob *OdrBook) MiningDescs(payout *big.Int) []*mining.OdrDesc {
 	ob.mtx.RLock()
 	defer ob.mtx.RUnlock()
 
 	orders := ob.bids
-	if amount.Sign() < 0 {
+	if payout.Sign() < 0 {
 		orders = ob.asks
-		amount = new(big.Int).Abs(amount)
+		payout = new(big.Int).Abs(payout)
 	}
 
-	descs, err := getOrdersForAmount(orders, amount)
+	descs, err := getOrdersForPayout(orders, payout)
 	if err != nil {
 		log.Errorf("Unable to get orders for mining: %v", err)
 		return nil
@@ -589,14 +589,15 @@ func (ob *OdrBook) MiningDescs(amount *big.Int) []*mining.OdrDesc {
 	return result
 }
 
+// Get orders to spend as much as possible of STB amount.
 // not thread safe
-func getOrdersForAmount(orders *list.List, amount *big.Int) ([]*OdrDesc, error) {
+func getOrdersForPayout(orders *list.List, payout *big.Int) ([]*OdrDesc, error) {
 	result := make([]*OdrDesc, 0, orders.Len())
-	remain := new(big.Int).Set(amount)
+	remain := new(big.Int).Set(payout)
 
 	for e := orders.Front(); e != nil; e = e.Next() {
 		odrDesc := e.Value.(*OdrDesc)
-		remain.Sub(remain, big.NewInt(int64(odrDesc.Amount)))
+		remain.Sub(remain, big.NewInt(int64(odrDesc.Payout)))
 		if remain.Sign() < 0 {
 			break
 		}
@@ -643,6 +644,7 @@ func (ob *OdrBook) RawMembookVerbose() map[string]*btcjson.GetRawMembookVerboseR
 	return result
 }
 
+// Get orders to cover as much as possible the market depth of NDR.
 // not thread safe
 func getOrdersForDepth(orders *list.List, depth float64) []*OdrDesc {
 	result := make([]*OdrDesc, 0, orders.Len())
@@ -655,7 +657,7 @@ func getOrdersForDepth(orders *list.List, depth float64) []*OdrDesc {
 
 		// limit the list by market depth param
 		if depth > 0 {
-			total += odrDesc.Amount.ToBTC()
+			total += odrDesc.Payout.ToBTC() / odrDesc.Price
 			if total >= depth {
 				return result
 			}
