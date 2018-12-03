@@ -798,14 +798,14 @@ func (mp *TxPool) maybeAcceptTransaction(tx *btcutil.Tx, isNew, rateLimit, rejec
 		return nil, nil, err
 	}
 
-	if balances[wire.STB] < 0 || balances[wire.NDR] < 0 {
+	if balances[wire.STB] > 0 || balances[wire.NDR] > 0 {
 		// it's an Order, wrong function to call
 		return nil, nil, txRuleError(wire.RejectInvalid,
 			"object is an order, not a transaction")
 	}
 
 	// TODO: estimate the total fee using NDR/STB rate
-	txFee := balances[wire.STB] + balances[wire.NDR]
+	txFee := -balances[wire.STB] - balances[wire.NDR]
 
 	// Don't allow transactions with non-standard inputs if the network
 	// parameters forbid their acceptance.

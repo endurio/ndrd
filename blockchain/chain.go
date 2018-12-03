@@ -8,6 +8,7 @@ package blockchain
 import (
 	"container/list"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
@@ -67,11 +68,12 @@ type BestState struct {
 	NumTxns     uint64         // The number of txns in the block.
 	TotalTxns   uint64         // The total number of txns in the chain.
 	MedianTime  time.Time      // Median time as per CalcPastMedianTime.
+	TotalSupply big.Int        // The total supply of STB in the chain.
 }
 
 // newBestState returns a new best stats instance for the given parameters.
 func newBestState(node *blockNode, blockSize, blockWeight, numTxns,
-	totalTxns uint64, medianTime time.Time) *BestState {
+	totalTxns uint64, medianTime time.Time, totalSupply *big.Int) *BestState {
 
 	return &BestState{
 		Hash:        node.hash,
@@ -82,6 +84,7 @@ func newBestState(node *blockNode, blockSize, blockWeight, numTxns,
 		NumTxns:     numTxns,
 		TotalTxns:   totalTxns,
 		MedianTime:  medianTime,
+		TotalSupply: *totalSupply,
 	}
 }
 
@@ -559,7 +562,7 @@ func (b *BlockChain) getReorganizeNodes(node *blockNode) (*list.List, *list.List
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
-	view *UtxoViewpoint, stxos []SpentTxOut) error {
+	view *UtxoViewpoint, stxos []SpentTxOut, supplyChange *big.Int) error {
 
 	// Make sure it's extending the end of the best chain.
 	prevHash := &block.MsgBlock().Header.PrevBlock
@@ -600,12 +603,14 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 	// database and later memory if all database updates are successful.
 	b.stateLock.RLock()
 	curTotalTxns := b.stateSnapshot.TotalTxns
+	totalSupply := b.stateSnapshot.TotalSupply
 	b.stateLock.RUnlock()
 	numTxns := uint64(len(block.MsgBlock().Transactions))
 	blockSize := uint64(block.MsgBlock().SerializeSize())
 	blockWeight := uint64(GetBlockWeight(block))
+	totalSupply.Add(&totalSupply, supplyChange)
 	state := newBestState(node, blockSize, blockWeight, numTxns,
-		curTotalTxns+numTxns, node.CalcPastMedianTime())
+		curTotalTxns+numTxns, node.CalcPastMedianTime(), &totalSupply)
 
 	// Atomically insert info into the database.
 	err = b.db.Update(func(dbTx database.Tx) error {
@@ -683,7 +688,9 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 // the main (best) chain.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view *UtxoViewpoint) error {
+func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block,
+	view *UtxoViewpoint, supplyChange *big.Int) error {
+
 	// Make sure the node being disconnected is the end of the best chain.
 	if !node.hash.IsEqual(&b.bestChain.Tip().hash) {
 		return AssertError("disconnectBlock must be called with the " +
@@ -712,13 +719,15 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block, view
 	// database and later memory if all database updates are successful.
 	b.stateLock.RLock()
 	curTotalTxns := b.stateSnapshot.TotalTxns
+	totalSupply := b.stateSnapshot.TotalSupply
 	b.stateLock.RUnlock()
 	numTxns := uint64(len(prevBlock.MsgBlock().Transactions))
 	blockSize := uint64(prevBlock.MsgBlock().SerializeSize())
 	blockWeight := uint64(GetBlockWeight(prevBlock))
 	newTotalTxns := curTotalTxns - uint64(len(block.MsgBlock().Transactions))
+	totalSupply.Add(&totalSupply, supplyChange)
 	state := newBestState(prevNode, blockSize, blockWeight, numTxns,
-		newTotalTxns, prevNode.CalcPastMedianTime())
+		newTotalTxns, prevNode.CalcPastMedianTime(), &totalSupply)
 
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
@@ -867,6 +876,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 	// and remove the utxos created by the blocks.
 	view := NewUtxoViewpoint()
 	view.SetBestHash(&oldBest.hash)
+
 	for e := detachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
 		var block *btcutil.Block
@@ -906,7 +916,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		detachBlocks = append(detachBlocks, block)
 		detachSpentTxOuts = append(detachSpentTxOuts, stxos)
 
-		err = view.disconnectTransactions(b.db, block, stxos)
+		_, err = view.disconnectTransactions(b.db, block, stxos)
 		if err != nil {
 			return err
 		}
@@ -957,7 +967,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 			if err != nil {
 				return err
 			}
-			err = view.connectTransactions(block, nil)
+			_, err = view.connectTransactions(block, nil)
 			if err != nil {
 				return err
 			}
@@ -974,7 +984,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		// In the case the block is determined to be invalid due to a
 		// rule violation, mark it as invalid and mark all of its
 		// descendants as having an invalid ancestor.
-		err = b.checkConnectBlock(n, block, view, nil)
+		_, err = b.checkConnectBlock(n, block, view, nil)
 		if err != nil {
 			if _, ok := err.(RuleError); ok {
 				b.index.SetStatusFlags(n, statusValidateFailed)
@@ -1012,14 +1022,14 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 
 		// Update the view to unspend all of the spent txos and remove
 		// the utxos created by the block.
-		err = view.disconnectTransactions(b.db, block,
+		balance, err := view.disconnectTransactions(b.db, block,
 			detachSpentTxOuts[i])
 		if err != nil {
 			return err
 		}
 
 		// Update the database and chain state.
-		err = b.disconnectBlock(n, block, view)
+		err = b.disconnectBlock(n, block, view, balance)
 		if err != nil {
 			return err
 		}
@@ -1042,13 +1052,13 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		// to it.  Also, provide an stxo slice so the spent txout
 		// details are generated.
 		stxos := make([]SpentTxOut, 0, countSpentOutputs(block))
-		err = view.connectTransactions(block, &stxos)
+		balance, err := view.connectTransactions(block, &stxos)
 		if err != nil {
 			return err
 		}
 
 		// Update the database and chain state.
-		err = b.connectBlock(n, block, view, stxos)
+		err = b.connectBlock(n, block, view, stxos, balance)
 		if err != nil {
 			return err
 		}
@@ -1103,6 +1113,8 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 		// Skip checks if node has already been fully validated.
 		fastAdd = fastAdd || b.index.NodeStatus(node).KnownValid()
 
+		var balance *big.Int
+
 		// Perform several checks to verify the block can be connected
 		// to the main chain without violating any rules and without
 		// actually connecting the block.
@@ -1110,7 +1122,8 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 		view.SetBestHash(parentHash)
 		stxos := make([]SpentTxOut, 0, countSpentOutputs(block))
 		if !fastAdd {
-			err := b.checkConnectBlock(node, block, view, &stxos)
+			var err error
+			balance, err = b.checkConnectBlock(node, block, view, &stxos)
 			if err == nil {
 				b.index.SetStatusFlags(node, statusValid)
 			} else if _, ok := err.(RuleError); ok {
@@ -1135,14 +1148,14 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *btcutil.Block, fla
 			if err != nil {
 				return false, err
 			}
-			err = view.connectTransactions(block, &stxos)
+			balance, err = view.connectTransactions(block, &stxos)
 			if err != nil {
 				return false, err
 			}
 		}
 
 		// Connect the block to the main chain.
-		err := b.connectBlock(node, block, view, stxos)
+		err := b.connectBlock(node, block, view, stxos, balance)
 		if err != nil {
 			// If we got hit with a rule error, then we'll mark
 			// that status of the block as invalid and flush the

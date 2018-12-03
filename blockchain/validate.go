@@ -882,18 +882,26 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *btcutil.Block, view *U
 // CheckTransactionSanity function prior to calling this function.
 //
 // RETURN the balances map for each TokenIdentity. Balance represents the value
-// different between input and output amount. Negative value represents the
-// amount the order want to buy. Possitive value represents the change for txs
+// different between input and output amount. Positive value represents the
+// amount the order want to buy. Negative value represents the change for txs
 // or the payout amount for the the order.
+// NOTE: CoinBaseTx also has balances returned.
 func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpoint,
 	chainParams *chaincfg.Params) (map[wire.TokenIdentity]int64, error) {
+
+	var balances = map[wire.TokenIdentity]int64{wire.STB: 0, wire.NDR: 0}
+
+	// Add each output amount for this transaction.  It is safe
+	// to ignore overflow and out of range errors here because those error
+	// conditions would have already been caught by checkTransactionSanity.
+	for _, txOut := range tx.MsgTx().TxOut {
+		balances[txOut.TokenID()] += txOut.Value
+	}
 
 	// Coinbase transactions have no inputs.
 	if IsCoinBase(tx) {
 		return nil, nil
 	}
-
-	var balances = map[wire.TokenIdentity]int64{wire.STB: 0, wire.NDR: 0}
 
 	for txInIndex, txIn := range tx.MsgTx().TxIn {
 		// Ensure the referenced input transaction is available.
@@ -949,22 +957,15 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpo
 		// allowed per transaction.  Also, we could potentially overflow
 		// the accumulator so check for overflow.
 		lastSatoshiIn := balances[token]
-		balances[token] += originTxSatoshi
-		if balances[token] < lastSatoshiIn ||
-			balances[token] > btcutil.MaxSatoshi {
+		balances[token] -= originTxSatoshi
+		if balances[token] > lastSatoshiIn ||
+			abs(balances[token]) > btcutil.MaxSatoshi {
 			str := fmt.Sprintf("total value of all transaction "+
 				"inputs for %v is %v which is higher than max "+
-				"allowed value of %v", token, balances[token],
+				"allowed value of %v", token, abs(balances[token]),
 				btcutil.MaxSatoshi)
 			return nil, ruleError(ErrBadTxOutValue, str)
 		}
-	}
-
-	// Subtrack each output amount for this transaction.  It is safe
-	// to ignore overflow and out of range errors here because those error
-	// conditions would have already been caught by checkTransactionSanity.
-	for _, txOut := range tx.MsgTx().TxOut {
-		balances[txOut.TokenID()] -= txOut.Value
 	}
 
 	// caller must check for value validity depend whether it's a tx or an odr
@@ -992,7 +993,8 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpo
 // with that node.
 //
 // This function MUST be called with the chain state lock held (for writes).
-func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, view *UtxoViewpoint, stxos *[]SpentTxOut) error {
+func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block,
+	view *UtxoViewpoint, stxos *[]SpentTxOut) (*big.Int, error) {
 	// If the side chain blocks end up in the database, a call to
 	// CheckBlockSanity should be done here in case a previous version
 	// allowed a block that is no longer valid.  However, since the
@@ -1002,7 +1004,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// Ensure the view is for the node being checked.
 	parentHash := &block.MsgBlock().Header.PrevBlock
 	if !view.BestHash().IsEqual(parentHash) {
-		return AssertError(fmt.Sprintf("inconsistent view when "+
+		return nil, AssertError(fmt.Sprintf("inconsistent view when "+
 			"checking block connection: best hash is %v instead "+
 			"of expected %v", view.BestHash(), parentHash))
 	}
@@ -1026,7 +1028,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	if !isBIP0030Node(node) && (node.height < b.chainParams.BIP0034Height) {
 		err := b.checkBIP0030(node, block, view)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -1037,7 +1039,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// transaction inputs, counting pay-to-script-hashes, and scripts.
 	err := view.fetchInputUtxos(b.db, block)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// BIP0016 describes a pay-to-script-hash type that is considered a
@@ -1051,7 +1053,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// the new rules.
 	segwitState, err := b.deploymentState(node.parent, chaincfg.DeploymentSegwit)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	enforceSegWit := segwitState == ThresholdActive
 
@@ -1073,7 +1075,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 		sigOpCost, err := GetSigOpCost(tx, i == 0, view, enforceBIP0016,
 			enforceSegWit)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		// Check for overflow or going over the limits.  We have to do
@@ -1084,9 +1086,11 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 			str := fmt.Sprintf("block contains too many "+
 				"signature operations - got %v, max %v",
 				totalSigOpCost, MaxBlockSigOpsCost)
-			return ruleError(ErrTooManySigOps, str)
+			return nil, ruleError(ErrTooManySigOps, str)
 		}
 	}
+
+	totalBalanceSTB := new(big.Int)
 
 	// Perform several checks on the inputs for each transaction.  Also
 	// accumulate the total fees.  This could technically be combined with
@@ -1095,28 +1099,30 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// still relatively cheap as compared to running the scripts) checks
 	// against all the inputs when the signature operations are out of
 	// bounds.
-	var totalFees = map[wire.TokenIdentity]int64{wire.STB: 0, wire.NDR: 0}
+	var totalTxBalances = map[wire.TokenIdentity]int64{wire.STB: 0, wire.NDR: 0}
 	for _, tx := range transactions {
-		balances, err := CheckTransactionInputs(tx, node.height, view,
+		txBalances, err := CheckTransactionInputs(tx, node.height, view,
 			b.chainParams)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		if balances[wire.STB] < 0 || balances[wire.NDR] < 0 {
-			// must be an order for a negative balance
+		if !IsCoinBase(tx) && (txBalances[wire.STB] > 0 || txBalances[wire.NDR] > 0) {
+			// must be an order for a positive balance
 			// TODO: process order in block here
-			continue
 		} else {
-			for token, lastTotalFees := range totalFees {
-				// Sum the total fees and ensure we don't overflow the
+			for token, lastTotalTxBalance := range totalTxBalances {
+				// Sum the total balance and ensure we don't overflow the
 				// accumulator.
-				totalFees[token] += balances[token]
-				if totalFees[token] < lastTotalFees {
-					str := fmt.Sprintf("total fees of %v for block "+
+				txBalance := txBalances[token]
+				totalTxBalance := lastTotalTxBalance + txBalance
+				if (txBalance > 0 && totalTxBalance < lastTotalTxBalance) ||
+					(txBalance < 0 && totalTxBalance > lastTotalTxBalance) {
+					str := fmt.Sprintf("total balance of %v for block "+
 						"overflows accumulator", token)
-					return ruleError(ErrBadFees, str)
+					return nil, ruleError(ErrBadFees, str)
 				}
+				totalTxBalances[token] = totalTxBalance
 			}
 		}
 
@@ -1124,32 +1130,25 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 		// provably unspendable as available utxos.  Also, the passed
 		// spent txos slice is updated to contain an entry for each
 		// spent txout in the order each transaction spends them.
-		err = view.connectTransaction(tx, node.height, stxos)
+		balanceSTB, err := view.connectTransaction(tx, node.height, stxos)
 		if err != nil {
-			return err
+			return nil, err
 		}
+		totalBalanceSTB.Add(totalBalanceSTB, big.NewInt(balanceSTB))
 	}
 
 	// The total output values of the coinbase transaction must not exceed
 	// the expected subsidy value plus total transaction fees gained from
-	// mining the block.  It is safe to ignore overflow and out of range
-	// errors here because those error conditions would have already been
-	// caught by checkTransactionSanity.
-	var totalSatoshiOut = map[wire.TokenIdentity]int64{wire.STB: 0, wire.NDR: 0}
-	for _, txOut := range transactions[0].MsgTx().TxOut {
-		totalSatoshiOut[txOut.TokenID()] += txOut.Value
-	}
-	for token, expectedSatoshiOut := range totalFees {
-		if token == wire.NDR {
-			// block reward is only paid in NDR
-			expectedSatoshiOut += CalcBlockSubsidy(node.height, b.chainParams)
-		}
-		if totalSatoshiOut[token] > expectedSatoshiOut {
-			str := fmt.Sprintf("coinbase transaction of %v for block pays %v "+
-				"which is more than expected value of %v",
-				token, totalSatoshiOut[token], expectedSatoshiOut)
-			return ruleError(ErrBadCoinbaseValue, str)
-		}
+	// mining the block.
+
+	// block reward is only paid in NDR
+	blockSubsidy := CalcBlockSubsidy(node.height, b.chainParams)
+
+	if totalTxBalances[wire.STB] > 0 || totalTxBalances[wire.NDR] > blockSubsidy {
+		str := fmt.Sprintf("coinbase transaction for block pays %v:%v "+
+			"which is more than expected value of %v:%v",
+			totalTxBalances[wire.STB], totalTxBalances[wire.NDR], 0, blockSubsidy)
+		return nil, ruleError(ErrBadCoinbaseValue, str)
 	}
 
 	// Don't run scripts if this node is before the latest known good
@@ -1188,7 +1187,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// the soft-fork deployment is fully active.
 	csvState, err := b.deploymentState(node.parent, chaincfg.DeploymentCSV)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if csvState == ThresholdActive {
 		// If the CSV soft-fork is now active, then modify the
@@ -1211,14 +1210,14 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 			sequenceLock, err := b.calcSequenceLock(node, tx, view,
 				false)
 			if err != nil {
-				return err
+				return nil, err
 			}
 			if !SequenceLockActive(sequenceLock, node.height,
 				medianTime) {
 				str := fmt.Sprintf("block contains " +
 					"transaction whose input sequence " +
 					"locks are not met")
-				return ruleError(ErrUnfinalizedTx, str)
+				return nil, ruleError(ErrUnfinalizedTx, str)
 			}
 		}
 	}
@@ -1238,7 +1237,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 		err := checkBlockScripts(block, view, scriptFlags, b.sigCache,
 			b.hashCache)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
@@ -1246,7 +1245,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block, vi
 	// transactions have been connected.
 	view.SetBestHash(&node.hash)
 
-	return nil
+	return totalBalanceSTB, nil
 }
 
 // CheckConnectBlockTemplate fully validates that connecting the passed block to
@@ -1286,5 +1285,13 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *btcutil.Block, chainParams
 	view := NewUtxoViewpoint()
 	view.SetBestHash(&tip.hash)
 	newNode := newBlockNode(&header, tip)
-	return b.checkConnectBlock(newNode, block, view, nil)
+	_, err = b.checkConnectBlock(newNode, block, view, nil)
+	return err
+}
+
+func abs(a int64) int64 {
+	if a < 0 {
+		return -a
+	}
+	return a
 }

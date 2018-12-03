@@ -763,7 +763,7 @@ mempoolLoop:
 		}
 
 		for token, balance := range balances {
-			if balance < 0 {
+			if balance > 0 {
 				// it's an order, not belong here
 				str := fmt.Sprintf("total %v value of all transaction inputs for "+
 					"transaction %v is less than the amount spent. Or perhaps it "+

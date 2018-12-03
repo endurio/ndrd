@@ -30,12 +30,12 @@ type OdrDesc struct {
 
 // IsBid returns whether an order is a bid (buying NDR)
 func (oD *OdrDesc) IsBid() bool {
-	return oD.balances[wire.NDR] < 0
+	return oD.balances[wire.NDR] > 0
 }
 
 // IsAsk return whether an order is an ask (selling NDR)
 func (oD *OdrDesc) IsAsk() bool {
-	return oD.balances[wire.STB] < 0
+	return oD.balances[wire.STB] > 0
 }
 
 // Amount returns the NDR amount of the order
@@ -182,11 +182,11 @@ func insertOrder(orders *list.List, orderDesc *OdrDesc) *list.Element {
 		o := e.Value.(*OdrDesc)
 
 		// comparing (orderDesc.stb / orderDesc.ndr) <= (o.stb / o.ndr)
-		a := big.NewInt(orderDesc.balances[wire.STB])
+		a := big.NewInt(abs(orderDesc.balances[wire.STB]))
 		a = a.Mul(a, big.NewInt(o.balances[wire.NDR]))
-		b := big.NewInt(o.balances[wire.STB])
+		b := big.NewInt(abs(o.balances[wire.STB]))
 		b = b.Mul(b, big.NewInt(orderDesc.balances[wire.NDR]))
-		if a.Cmp(b) <= 0 {
+		if a.Cmp(b) > 0 {
 			break
 		}
 	}
@@ -412,7 +412,7 @@ func (ob *OdrBook) maybeAcceptOrder(order *btcutil.Odr) (*OdrDesc, error) {
 		return nil, err
 	}
 
-	if balances[wire.STB] >= 0 && balances[wire.NDR] >= 0 {
+	if balances[wire.STB] <= 0 && balances[wire.NDR] <= 0 {
 		str := fmt.Sprintf("Not an order: %v", txHash)
 		return nil, blockchain.RuleError{
 			ErrorCode:   blockchain.ErrNotAnOrder,
@@ -643,7 +643,9 @@ func (ob *OdrBook) OrderBook(depth float64) ([]*btcjson.GetOrderBookResult, erro
 	result := make([]*btcjson.GetOrderBookResult, len(asks)+len(bids))
 
 	var idx int
-	for _, odrDesc := range asks {
+	// asks list is reverted
+	for i := len(asks) - 1; i >= 0; i-- {
+		odrDesc := asks[i]
 		result[idx] = odrDesc.OrderBookResult()
 		idx++
 	}
