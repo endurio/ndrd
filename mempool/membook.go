@@ -16,6 +16,7 @@ import (
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/mining"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
@@ -24,7 +25,7 @@ import (
 // OdrDesc is a descriptor containing an order in the mempool along with
 // additional metadata.
 type OdrDesc struct {
-	*btcutil.Odr
+	mining.OdrDesc
 	balances map[wire.TokenIdentity]int64
 }
 
@@ -70,6 +71,9 @@ type OdrBook struct {
 	book      map[chainhash.Hash]*list.Element
 	outpoints map[wire.OutPoint]*list.Element
 }
+
+// Ensure the OdrBook type implements the mining.OdrSource interface.
+var _ mining.OdrSource = (*OdrBook)(nil)
 
 // isOrderInBook returns whether or not the passed order already
 // exists in the main book.
@@ -205,7 +209,9 @@ func (ob *OdrBook) addOrder(odr *btcutil.Odr,
 	balances map[wire.TokenIdentity]int64, height int32) *OdrDesc {
 
 	odrDesc := &OdrDesc{
-		Odr:      odr,
+		OdrDesc: mining.OdrDesc{
+			Odr: odr,
+		},
 		balances: balances,
 	}
 
@@ -568,6 +574,56 @@ func (ob *OdrBook) OdrDescs() []*OdrDesc {
 	ob.mtx.RUnlock()
 
 	return descs
+}
+
+// MiningDescs returns a slice of mining descriptors for all the orders
+// in the pool.
+//
+// This is part of the mining.OdrSource interface implementation and is safe for
+// concurrent access as required by the interface contract.
+func (ob *OdrBook) MiningDescs(amount *big.Int) []*mining.OdrDesc {
+	ob.mtx.RLock()
+	defer ob.mtx.RUnlock()
+
+	orders := ob.bids
+	if amount.Sign() < 0 {
+		orders = ob.asks
+		amount = new(big.Int).Abs(amount)
+	}
+
+	descs, err := getOrdersForAmount(orders, amount)
+	if err != nil {
+		log.Errorf("Unable to get orders for mining: %v", err)
+		return nil
+	}
+	result := make([]*mining.OdrDesc, len(descs))
+	i := 0
+	for _, desc := range descs {
+		result[i] = &desc.OdrDesc
+		i++
+	}
+	return result
+}
+
+// not thread safe
+func getOrdersForAmount(orders *list.List, amount *big.Int) ([]*OdrDesc, error) {
+	result := make([]*OdrDesc, 0, orders.Len())
+	remain := new(big.Int).Set(amount)
+
+	for e := orders.Front(); e != nil; e = e.Next() {
+		odrDesc := e.Value.(*OdrDesc)
+		amt, err := btcutil.NewAmount(odrDesc.Amount())
+		if err != nil {
+			return nil, err
+		}
+		remain.Sub(remain, big.NewInt(abs(int64(amt))))
+		if remain.Sign() < 0 {
+			break
+		}
+		result = append(result, odrDesc)
+	}
+
+	return result, nil
 }
 
 // RawMembookVerbose returns all of the entries in the mempool as a fully

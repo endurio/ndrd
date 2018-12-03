@@ -16,6 +16,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/database"
 	"github.com/btcsuite/btcd/mempool"
+	"github.com/btcsuite/btcd/mining"
 	peerpkg "github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
@@ -1417,7 +1418,9 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 				sm.txMemPool.RemoveDoubleSpends(tx)
 				sm.odrMemBook.RemoveDoubleSpends(tx)
 				sm.peerNotifier.OrderFilled(odr)
-				sm.peerNotifier.AnnounceNewOrders([]*mempool.OdrDesc{&mempool.OdrDesc{Odr: odr}})
+				sm.peerNotifier.AnnounceNewOrders([]*mempool.OdrDesc{
+					&mempool.OdrDesc{OdrDesc: mining.OdrDesc{Odr: odr}},
+				})
 			}
 		}
 

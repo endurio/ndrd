@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"container/heap"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/btcsuite/btcd/blockchain"
@@ -71,6 +72,47 @@ type TxSource interface {
 	// HaveTransaction returns whether or not the passed transaction hash
 	// exists in the source pool.
 	HaveTransaction(hash *chainhash.Hash) bool
+}
+
+// OdrDesc is a descriptor about a order in a order source along with
+// additional metadata.
+type OdrDesc struct {
+	// Odr is the order associated with the entry.
+	*btcutil.Odr
+
+	// Added is the time when the entry was added to the source pool.
+	Added time.Time
+
+	// Height is the block height when the entry was added to the the source
+	// pool.
+	Height int32
+
+	// Amount is the total NDR the order associated with the entry buys or sells.
+	Amount int64
+
+	// Price is the price the order pays in NDR/STB.
+	Price float64
+}
+
+// OdrSource represents a source of orders to consider for inclusion in
+// new blocks.
+//
+// The interface contract requires that all of these methods are safe for
+// concurrent access with respect to the source.
+type OdrSource interface {
+	// LastUpdated returns the last time a order was added to or
+	// removed from the source pool.
+	LastUpdated() time.Time
+
+	// MiningDescs returns a slice of mining descriptors for all the
+	// orders in the source pool to fill the provided amount.
+	// Positive amount returns bidding orders. Negative amount returns
+	// asking order.
+	MiningDescs(amount *big.Int) []*OdrDesc
+
+	// HaveOrder returns whether or not the passed order hash
+	// exists in the source pool.
+	HaveOrder(hash *chainhash.Hash) bool
 }
 
 // txPrioItem houses a transaction along with extra information that allows the
@@ -359,6 +401,7 @@ func medianAdjustedTime(chainState *blockchain.BestState, timeSource blockchain.
 type BlkTmplGenerator struct {
 	policy      *Policy
 	chainParams *chaincfg.Params
+	odrSource   OdrSource
 	txSource    TxSource
 	chain       *blockchain.BlockChain
 	timeSource  blockchain.MedianTimeSource
@@ -374,6 +417,7 @@ type BlkTmplGenerator struct {
 // templates are built on top of the current best chain and adhere to the
 // consensus rules.
 func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
+	odrSource OdrSource,
 	txSource TxSource, chain *blockchain.BlockChain,
 	timeSource blockchain.MedianTimeSource,
 	priceSource blockchain.FeedPriceSource,
@@ -383,6 +427,7 @@ func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 	return &BlkTmplGenerator{
 		policy:      policy,
 		chainParams: params,
+		odrSource:   odrSource,
 		txSource:    txSource,
 		chain:       chain,
 		timeSource:  timeSource,
@@ -478,6 +523,9 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress btcutil.Address) (*Bloc
 		return nil, err
 	}
 	coinbaseSigOpCost := int64(blockchain.CountSigOps(coinbaseTx)) * blockchain.WitnessScaleFactor
+
+	sourceOdrs := g.odrSource.MiningDescs(big.NewInt(13))
+	_ = sourceOdrs
 
 	// Get the current source transactions and create a priority queue to
 	// hold the transactions which are ready for inclusion into a block
