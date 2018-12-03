@@ -26,35 +26,14 @@ import (
 // additional metadata.
 type OdrDesc struct {
 	mining.OdrDesc
-	balances map[wire.TokenIdentity]int64
-}
-
-// IsBid returns whether an order is a bid (buying NDR)
-func (oD *OdrDesc) IsBid() bool {
-	return oD.balances[wire.NDR] > 0
-}
-
-// IsAsk return whether an order is an ask (selling NDR)
-func (oD *OdrDesc) IsAsk() bool {
-	return oD.balances[wire.STB] > 0
-}
-
-// Amount returns the NDR amount of the order
-func (oD *OdrDesc) Amount() float64 {
-	return btcutil.Amount(abs(oD.balances[wire.NDR])).ToBTC()
-}
-
-// Price returns the NDR/STB price of the order
-func (oD *OdrDesc) Price() float64 {
-	return -float64(oD.balances[wire.STB]) / float64(oD.balances[wire.NDR])
 }
 
 // OrderBookResult returns OrderBookResult object for the order
 func (oD *OdrDesc) OrderBookResult() *btcjson.GetOrderBookResult {
 	return &btcjson.GetOrderBookResult{
-		Bid:    oD.IsBid(),
-		Price:  oD.Price(),
-		Amount: oD.Amount(),
+		Bid:    oD.Bid,
+		Price:  oD.Price,
+		Amount: oD.Amount.ToBTC(),
 	}
 }
 
@@ -135,7 +114,7 @@ func (ob *OdrBook) removeOrder(order *btcutil.Odr) {
 			delete(ob.outpoints, txIn.PreviousOutPoint)
 		}
 		delete(ob.book, *txHash)
-		if element.Value.(*OdrDesc).IsBid() {
+		if element.Value.(*OdrDesc).Bid {
 			ob.bids.Remove(element)
 		} else {
 			ob.asks.Remove(element)
@@ -185,13 +164,16 @@ func insertOrder(orders *list.List, orderDesc *OdrDesc) *list.Element {
 	for ; e != nil; e = e.Next() {
 		o := e.Value.(*OdrDesc)
 
-		// comparing (orderDesc.stb / orderDesc.ndr) <= (o.stb / o.ndr)
-		a := big.NewInt(abs(orderDesc.balances[wire.STB]))
-		a = a.Mul(a, big.NewInt(o.balances[wire.NDR]))
-		b := big.NewInt(abs(o.balances[wire.STB]))
-		b = b.Mul(b, big.NewInt(orderDesc.balances[wire.NDR]))
-		if a.Cmp(b) > 0 {
-			break
+		if orderDesc.Bid {
+			// biding orders sorted from highest bidder down
+			if orderDesc.Price > o.Price {
+				break
+			}
+		} else {
+			// asking orders sorted from lowser asker up
+			if orderDesc.Price < o.Price {
+				break
+			}
 		}
 	}
 	if e == nil {
@@ -205,18 +187,20 @@ func insertOrder(orders *list.List, orderDesc *OdrDesc) *list.Element {
 // helper for maybeAcceptOrder.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (ob *OdrBook) addOrder(odr *btcutil.Odr,
-	balances map[wire.TokenIdentity]int64, height int32) *OdrDesc {
-
+func (ob *OdrBook) addOrder(odr *btcutil.Odr, stb, ndr int64, height int32) *OdrDesc {
 	odrDesc := &OdrDesc{
 		OdrDesc: mining.OdrDesc{
-			Odr: odr,
+			Odr:    odr,
+			Added:  time.Now(),
+			Height: height,
+			Bid:    ndr > 0,
+			Amount: btcutil.Amount(abs(ndr)),
+			Price:  float64(abs(stb)) / float64(abs(ndr)),
 		},
-		balances: balances,
 	}
 
 	var element *list.Element
-	if odrDesc.IsBid() {
+	if odrDesc.Bid {
 		element = insertOrder(ob.bids, odrDesc)
 	} else {
 		element = insertOrder(ob.asks, odrDesc)
@@ -480,7 +464,7 @@ func (ob *OdrBook) maybeAcceptOrder(order *btcutil.Odr) (*OdrDesc, error) {
 	}
 
 	// Add to transaction pool.
-	oD := ob.addOrder(order, balances, bestHeight)
+	oD := ob.addOrder(order, balances[wire.STB], balances[wire.NDR], bestHeight)
 
 	log.Debugf("Accepted order %v (book size: %v)", txHash, len(ob.book))
 
@@ -612,11 +596,7 @@ func getOrdersForAmount(orders *list.List, amount *big.Int) ([]*OdrDesc, error) 
 
 	for e := orders.Front(); e != nil; e = e.Next() {
 		odrDesc := e.Value.(*OdrDesc)
-		amt, err := btcutil.NewAmount(odrDesc.Amount())
-		if err != nil {
-			return nil, err
-		}
-		remain.Sub(remain, big.NewInt(abs(int64(amt))))
+		remain.Sub(remain, big.NewInt(int64(odrDesc.Amount)))
 		if remain.Sign() < 0 {
 			break
 		}
@@ -675,7 +655,7 @@ func getOrdersForDepth(orders *list.List, depth float64) []*OdrDesc {
 
 		// limit the list by market depth param
 		if depth > 0 {
-			total += odrDesc.Amount()
+			total += odrDesc.Amount.ToBTC()
 			if total >= depth {
 				return result
 			}
