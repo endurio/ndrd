@@ -1107,9 +1107,10 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block,
 			return nil, err
 		}
 
-		if !IsCoinBase(tx) && (txBalances[wire.STB] > 0 || txBalances[wire.NDR] > 0) {
-			// must be an order for a positive balance
-			// TODO: process order in block here
+		if IsCoinBase(tx) {
+			// coinbase tx doesnot count to totalTxBalances (fee)
+		} else if txBalances[wire.STB] > 0 || txBalances[wire.NDR] > 0 {
+			// filled order doesnot count to totalTxBalances (fee)
 		} else {
 			for token, lastTotalTxBalance := range totalTxBalances {
 				// Sum the total balance and ensure we don't overflow the
@@ -1139,16 +1140,25 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block,
 
 	// The total output values of the coinbase transaction must not exceed
 	// the expected subsidy value plus total transaction fees gained from
-	// mining the block.
-
-	// block reward is only paid in NDR
-	blockSubsidy := CalcBlockSubsidy(node.height, b.chainParams)
-
-	if totalTxBalances[wire.STB] > 0 || totalTxBalances[wire.NDR] > blockSubsidy {
-		str := fmt.Sprintf("coinbase transaction for block pays %v:%v "+
-			"which is more than expected value of %v:%v",
-			totalTxBalances[wire.STB], totalTxBalances[wire.NDR], 0, blockSubsidy)
-		return nil, ruleError(ErrBadCoinbaseValue, str)
+	// mining the block.  It is safe to ignore overflow and out of range
+	// errors here because those error conditions would have already been
+	// caught by checkTransactionSanity.
+	var totalSatoshiOut = map[wire.TokenIdentity]int64{wire.STB: 0, wire.NDR: 0}
+	for _, txOut := range transactions[0].MsgTx().TxOut {
+		totalSatoshiOut[txOut.TokenID()] += txOut.Value
+	}
+	for token, totalTxBalance := range totalTxBalances {
+		expectedSatoshiOut := -totalTxBalance
+		if token == wire.NDR {
+			// block reward is only paid in NDR
+			expectedSatoshiOut += CalcBlockSubsidy(node.height, b.chainParams)
+		}
+		if totalSatoshiOut[token] > expectedSatoshiOut {
+			str := fmt.Sprintf("coinbase transaction of %v for block pays %v "+
+				"which is more than expected value of %v",
+				token, totalSatoshiOut[token], expectedSatoshiOut)
+			return nil, ruleError(ErrBadCoinbaseValue, str)
+		}
 	}
 
 	// Don't run scripts if this node is before the latest known good
