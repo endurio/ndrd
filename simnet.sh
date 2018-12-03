@@ -87,6 +87,10 @@ if [[ $daemon -ne 0 ]]; then
 		$CTL generate 1
 		$CTLW stop
 	fi
+
+	# restart the daemon for persistent test
+	$CTL stop && sleep 3s
+	$START $BTCD
 fi
 
 if [[ $wallet -ne 0 ]]; then
@@ -105,7 +109,7 @@ if [[ $wallet -ne 0 ]]; then
 	$CTLW sendmany default {${bb::-1}} STB
 	$CTL generate 1
 
-	for i in {0..5}; do
+	for i in {0..9}; do
 		$CTLW ask 0.$((RANDOM%5))$((RANDOM%9+1)) 2.$((RANDOM%2))$((RANDOM%10))
 		$CTLW bid 0.$((RANDOM%5))$((RANDOM%9+1)) 1.$((RANDOM%2+8))$((RANDOM%10))
 	done
