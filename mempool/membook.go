@@ -28,12 +28,17 @@ type OdrDesc struct {
 	mining.OdrDesc
 }
 
+// Price returns the order price.
+func (oD *OdrDesc) Price() float64 {
+	return float64(oD.Payout) / float64(oD.Amount)
+}
+
 // OrderBookResult returns OrderBookResult object for the order
 func (oD *OdrDesc) OrderBookResult() *btcjson.GetOrderBookResult {
 	return &btcjson.GetOrderBookResult{
 		Bid:    oD.Bid,
-		Price:  oD.Price,
-		Amount: oD.Payout.ToBTC() / oD.Price,
+		Price:  oD.Price(),
+		Amount: oD.Amount.ToBTC(),
 	}
 }
 
@@ -159,6 +164,7 @@ func (ob *OdrBook) RemoveDoubleSpends(tx *btcutil.Tx) {
 }
 
 func insertOrder(orders *list.List, orderDesc *OdrDesc) *list.Element {
+	price := orderDesc.Price()
 	// ordered insert
 	e := orders.Front()
 	for ; e != nil; e = e.Next() {
@@ -166,12 +172,12 @@ func insertOrder(orders *list.List, orderDesc *OdrDesc) *list.Element {
 
 		if orderDesc.Bid {
 			// biding orders sorted from highest bidder down
-			if orderDesc.Price > o.Price {
+			if price > o.Price() {
 				break
 			}
 		} else {
 			// asking orders sorted from lowser asker up
-			if orderDesc.Price < o.Price {
+			if price < o.Price() {
 				break
 			}
 		}
@@ -194,8 +200,8 @@ func (ob *OdrBook) addOrder(odr *btcutil.Odr, stb, ndr int64, height int32) *Odr
 			Added:  time.Now(),
 			Height: height,
 			Bid:    ndr > 0,
+			Amount: btcutil.Amount(abs(ndr)),
 			Payout: btcutil.Amount(abs(stb)),
-			Price:  float64(abs(stb)) / float64(abs(ndr)),
 		},
 	}
 
@@ -657,7 +663,7 @@ func getOrdersForDepth(orders *list.List, depth float64) []*OdrDesc {
 
 		// limit the list by market depth param
 		if depth > 0 {
-			total += odrDesc.Payout.ToBTC() / odrDesc.Price
+			total += odrDesc.Amount.ToBTC()
 			if total >= depth {
 				return result
 			}

@@ -87,14 +87,14 @@ type OdrDesc struct {
 	// pool.
 	Height int32
 
-	// Bid is the direction of the order: bid is for buying NDR, ask is for selling.
+	// Bid is the direction of the order for buying NDR.
 	Bid bool
+
+	// Amount is the total NDR will be bought or sold by the order.
+	Amount btcutil.Amount
 
 	// Payout is the total STB will be spent by the order associated with the entry.
 	Payout btcutil.Amount
-
-	// Price is the price the order pays in NDR/STB.
-	Price float64
 }
 
 // OdrSource represents a source of orders to consider for inclusion in
