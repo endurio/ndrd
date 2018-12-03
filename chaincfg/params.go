@@ -15,6 +15,18 @@ import (
 	"github.com/btcsuite/btcd/wire"
 )
 
+const (
+	mvpTimeRate   = 4
+	epochTimeSpan = time.Hour * 24 * 7 / mvpTimeRate
+	blockPerEpoch = 1024 * 4
+	blockTime     = epochTimeSpan / blockPerEpoch
+	
+	// PreminedSTB defines the premined amount of STB.
+	PreminedSTB = 13 * 1e6 // btcutil.SatoshiPerBitcoin
+	// PreminedNDR defines the premined amount of NDR.
+	PreminedNDR = 6 * 1e6  // btcutil.SatoshiPerBitcoin
+)
+
 // These variables are the chain proof-of-work limit parameters for each default
 // network.
 var (
@@ -148,6 +160,8 @@ type Params struct {
 	// is reduced.
 	SubsidyReductionInterval int32
 
+	BlockPerTimespan int32
+
 	// TargetTimespan is the desired amount of time that should elapse
 	// before the block difficulty requirement is examined to determine how
 	// it should be changed in order to maintain the desired block
@@ -241,9 +255,10 @@ var MainNetParams = Params{
 	BIP0066Height:            0, // Always active on Endurio
 	CoinbaseMaturity:         0,
 	SubsidyReductionInterval: 210000,
-	TargetTimespan:           time.Hour * 24 * 7,             // 7 days
-	TargetTimePerBlock:       time.Hour * 24 * 7 / 1024 / 16, // Block time
-	RetargetAdjustmentFactor: 4,                              // 25% less, 400% more
+	BlockPerTimespan:         blockPerEpoch,
+	TargetTimespan:           epochTimeSpan, // 7 days
+	TargetTimePerBlock:       blockTime,     // Block time
+	RetargetAdjustmentFactor: 4,             // 25% less, 400% more
 	ReduceMinDifficulty:      false,
 	MinDiffReductionTime:     0,
 	GenerateSupported:        false,

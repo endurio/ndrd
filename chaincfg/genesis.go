@@ -42,7 +42,7 @@ var genesisCoinbaseTx = wire.MsgTx{
 	},
 	TxOut: []*wire.TxOut{
 		{
-			Value: 13 * 1e6, // btcutil.SatoshiPerBitcoin
+			Value: PreminedSTB,
 			PkScript: []byte{
 				0x76,                                           // OP_DUP
 				0xA9,                                           // OP_HASH160,
@@ -55,7 +55,7 @@ var genesisCoinbaseTx = wire.MsgTx{
 			},
 		},
 		{
-			Value: 6 * 1e6, // btcutil.SatoshiPerBitcoin
+			Value: PreminedNDR,
 			PkScript: []byte{
 				0x76,                                           // OP_DUP
 				0xA9,                                           // OP_HASH160,
@@ -187,7 +187,7 @@ var simNetGenesisCoinbaseTx = wire.MsgTx{
 	},
 	TxOut: []*wire.TxOut{
 		{
-			Value: 13 * 1e6, // btcutil.SatoshiPerBitcoin
+			Value: PreminedSTB,
 			PkScript: []byte{
 				0x76,                                           // OP_DUP
 				0xA9,                                           // OP_HASH160,
@@ -200,7 +200,7 @@ var simNetGenesisCoinbaseTx = wire.MsgTx{
 			},
 		},
 		{
-			Value: 6 * 1e6, // btcutil.SatoshiPerBitcoin
+			Value: PreminedNDR,
 			PkScript: []byte{
 				0x76,                                           // OP_DUP
 				0xA9,                                           // OP_HASH160,
