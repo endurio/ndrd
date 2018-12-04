@@ -285,8 +285,7 @@ func (tokenID TokenIdentity) String() string {
 
 // TokenID returns the token identity recorded in the PkScript
 func TokenID(pkScript []byte) TokenIdentity {
-	scriptLen := len(pkScript)
-	if scriptLen > 0 && pkScript[scriptLen-1] == OP_NDR {
+	if beginsWithNDR(pkScript) {
 		return NDR
 	}
 	return STB
@@ -294,20 +293,22 @@ func TokenID(pkScript []byte) TokenIdentity {
 
 // StripTokenID strips the prepended token opcode and data
 func StripTokenID(pkScript []byte) []byte {
-	scriptLen := len(pkScript)
-	if scriptLen > 0 && pkScript[scriptLen-1] == OP_NDR {
-		return pkScript[:scriptLen-1]
+	if beginsWithNDR(pkScript) {
+		return pkScript[1:]
 	}
 	return pkScript
 }
 
 // SwapToken ...
 func SwapToken(pkScript []byte) []byte {
-	scriptLen := len(pkScript)
-	if scriptLen > 0 && pkScript[scriptLen-1] == OP_NDR {
-		return pkScript[:scriptLen-1]
+	if beginsWithNDR(pkScript) {
+		return pkScript[1:]
 	}
-	return append(pkScript, OP_NDR)
+	return prepend(OP_NDR, pkScript)
+}
+
+func beginsWithNDR(pkScript []byte) bool {
+	return len(pkScript) > 0 && pkScript[0] == OP_NDR
 }
 
 // TokenID returns the token identity recorded in the TxOut
@@ -341,7 +342,7 @@ func NewTxOut(value int64, pkScript []byte) *TxOut {
 // transaction value, public key script and token identity.
 func NewTxOutToken(value int64, pkScript []byte, tokenID TokenIdentity) *TxOut {
 	if tokenID == NDR {
-		pkScript = append(pkScript, OP_NDR)
+		pkScript = prepend(OP_NDR, pkScript)
 	}
 	return &TxOut{
 		Value:    value,
@@ -1093,4 +1094,11 @@ func writeTxWitness(w io.Writer, pver uint32, version int32, wit [][]byte) error
 		}
 	}
 	return nil
+}
+
+func prepend(b byte, s []byte) []byte {
+	s = append(s, 0)
+	copy(s[1:], s)
+	s[0] = b
+	return s
 }

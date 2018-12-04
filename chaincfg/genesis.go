@@ -57,6 +57,7 @@ var genesisCoinbaseTx = wire.MsgTx{
 		{
 			Value: PreminedNDR,
 			PkScript: []byte{
+				wire.OP_NDR,
 				0x76,                                           // OP_DUP
 				0xA9,                                           // OP_HASH160,
 				0x14,                                           // bytes to push
@@ -65,7 +66,6 @@ var genesisCoinbaseTx = wire.MsgTx{
 				0x91, 0xC7, 0x46, 0xEE,
 				0x88, // OP_EQUALVERIFY,
 				0xAC, // OP_CHECKSIG,
-				wire.OP_NDR,
 			},
 		},
 	},
@@ -202,6 +202,7 @@ var simNetGenesisCoinbaseTx = wire.MsgTx{
 		{
 			Value: PreminedNDR,
 			PkScript: []byte{
+				wire.OP_NDR,
 				0x76,                                           // OP_DUP
 				0xA9,                                           // OP_HASH160,
 				0x14,                                           // bytes to push
@@ -210,7 +211,6 @@ var simNetGenesisCoinbaseTx = wire.MsgTx{
 				0x0D, 0x1D, 0xBC, 0xE9,
 				0x88, // OP_EQUALVERIFY,
 				0xAC, // OP_CHECKSIG,
-				wire.OP_NDR,
 			},
 		},
 	},
