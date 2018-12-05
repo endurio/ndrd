@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"container/heap"
 	"fmt"
+	"math"
 	"math/big"
 	"time"
 
@@ -527,11 +528,15 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress btcutil.Address) (*Bloc
 	}
 	coinbaseSigOpCost := int64(blockchain.CountSigOps(coinbaseTx)) * blockchain.WitnessScaleFactor
 
+	var queueLen int
+	var sourceOdrs []*OdrDesc
+
+	// Get the current orders to fill the next absorption.
 	absorption := g.chain.CalcNextAbsorption()
 	if absorption != nil {
 		// absorb the orders
-		sourceOdrs := g.odrSource.MiningDescs(absorption)
-		_ = sourceOdrs
+		sourceOdrs = g.odrSource.MiningDescs(absorption)
+		queueLen += len(sourceOdrs)
 	}
 
 	// Get the current source transactions and create a priority queue to
@@ -542,13 +547,14 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress btcutil.Address) (*Bloc
 	// or not there is an area allocated for high-priority transactions.
 	sourceTxns := g.txSource.MiningDescs()
 	sortedByFee := g.policy.BlockPrioritySize == 0
-	priorityQueue := newTxPriorityQueue(len(sourceTxns), sortedByFee)
+	queueLen += len(sourceTxns)
+	priorityQueue := newTxPriorityQueue(queueLen, sortedByFee)
 
 	// Create a slice to hold the transactions to be included in the
 	// generated block with reserved space.  Also create a utxo view to
 	// house all of the input transactions so multiple lookups can be
 	// avoided.
-	blockTxns := make([]*btcutil.Tx, 0, len(sourceTxns))
+	blockTxns := make([]*btcutil.Tx, 0, queueLen)
 	blockTxns = append(blockTxns, coinbaseTx)
 	blockUtxos := blockchain.NewUtxoViewpoint()
 
@@ -569,6 +575,14 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress btcutil.Address) (*Bloc
 	txSigOpCosts := make([]int64, 0, len(sourceTxns))
 	txFees = append(txFees, -1) // Updated once known
 	txSigOpCosts = append(txSigOpCosts, coinbaseSigOpCost)
+
+	log.Debugf("Considering %d orders for inclusion to new block",
+		len(sourceOdrs))
+
+	g.orderbookLoop(sourceOdrs, nextBlockHeight, dependers, priorityQueue, blockUtxos)
+
+	log.Tracef("Priority queue len %d, dependers len %d",
+		priorityQueue.Len(), len(dependers))
 
 	log.Debugf("Considering %d transactions for inclusion to new block",
 		len(sourceTxns))
@@ -977,6 +991,93 @@ mempoolLoop:
 		ValidPayAddress:   payToAddress != nil,
 		WitnessCommitment: witnessCommitment,
 	}, nil
+}
+
+func (g *BlkTmplGenerator) orderbookLoop(sourceOdrs []*OdrDesc, nextBlockHeight int32, dependers map[chainhash.Hash]map[chainhash.Hash]*txPrioItem, priorityQueue *txPriorityQueue, blockUtxos *blockchain.UtxoViewpoint) {
+
+membookLoop:
+	for _, odrDesc := range sourceOdrs {
+		// A block can't have more than one coinbase or contain
+		// non-finalized orders.
+		tx := odrDesc.Tx
+		if blockchain.IsCoinBase(tx) {
+			log.Tracef("Order cannot be coinbase %s", tx.Hash())
+			continue
+		}
+		if !blockchain.IsFinalizedTransaction(tx, nextBlockHeight,
+			g.timeSource.AdjustedTime()) {
+
+			log.Tracef("Skipping non-finalized odr %s", tx.Hash())
+			continue
+		}
+
+		// Fetch all of the utxos referenced by the this order.
+		// NOTE: This intentionally does not fetch inputs from the
+		// mempool since a order which depends on other
+		// orders in the mempool must come after those
+		// dependencies in the final generated block.
+		utxos, err := g.chain.FetchUtxoView(tx)
+		if err != nil {
+			log.Warnf("Unable to fetch utxo view for tx %s: %v",
+				tx.Hash(), err)
+			continue
+		}
+
+		// Setup dependencies for any orders which reference
+		// other orders in the mempool so they can be properly
+		// ordered below.
+		prioItem := &txPrioItem{tx: tx}
+		for _, txIn := range tx.MsgTx().TxIn {
+			originHash := &txIn.PreviousOutPoint.Hash
+			entry := utxos.LookupEntry(txIn.PreviousOutPoint)
+			if entry == nil || entry.IsSpent() {
+				if !g.txSource.HaveTransaction(originHash) {
+					log.Tracef("Skipping odr %s because it "+
+						"references unspent output %s "+
+						"which is not available",
+						tx.Hash(), txIn.PreviousOutPoint)
+					continue membookLoop
+				}
+
+				// The order is referencing another
+				// order in the source pool, so setup an
+				// ordering dependency.
+				deps, exists := dependers[*originHash]
+				if !exists {
+					deps = make(map[chainhash.Hash]*txPrioItem)
+					dependers[*originHash] = deps
+				}
+				deps[*prioItem.tx.Hash()] = prioItem
+				if prioItem.dependsOn == nil {
+					prioItem.dependsOn = make(
+						map[chainhash.Hash]struct{})
+				}
+				prioItem.dependsOn[*originHash] = struct{}{}
+
+				// Skip the check below. We already know the
+				// referenced order is available.
+				continue
+			}
+		}
+
+		// Order always have maximum priority
+		prioItem.priority = math.MaxFloat64
+
+		// Calculate the fee in Satoshi/kB.
+		prioItem.feePerKB = 0
+		prioItem.fee = 0
+
+		// Add the order to the priority queue to mark it ready
+		// for inclusion in the block unless it has dependencies.
+		if prioItem.dependsOn == nil {
+			heap.Push(priorityQueue, prioItem)
+		}
+
+		// Merge the referenced outputs from the input orders to
+		// this order into the block utxo view.  This allows the
+		// code below to avoid a second lookup.
+		mergeUtxoView(blockUtxos, utxos)
+	}
 }
 
 // UpdateBlockTime updates the timestamp in the header of the passed block to
