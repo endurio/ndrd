@@ -68,12 +68,14 @@ type BestState struct {
 	NumTxns     uint64         // The number of txns in the block.
 	TotalTxns   uint64         // The total number of txns in the chain.
 	MedianTime  time.Time      // Median time as per CalcPastMedianTime.
-	TotalSupply big.Int        // The total supply of STB in the chain.
+
+	TotalSupply    big.Int // The total supply of STB in the chain.
+	LastAbsnHeight int32   // The height of last absorption block.
+	LastAbsnSupply big.Int // The total supply of STB in the last absorption block.
 }
 
 // newBestState returns a new best stats instance for the given parameters.
-func newBestState(node *blockNode, blockSize, blockWeight, numTxns,
-	totalTxns uint64, medianTime time.Time, totalSupply *big.Int) *BestState {
+func newBestState(node *blockNode, blockSize, blockWeight, numTxns, totalTxns uint64, medianTime time.Time, totalSupply, lastAbsnSupply *big.Int, lastAbsnHeight int32) *BestState {
 
 	return &BestState{
 		Hash:        node.hash,
@@ -84,7 +86,10 @@ func newBestState(node *blockNode, blockSize, blockWeight, numTxns,
 		NumTxns:     numTxns,
 		TotalTxns:   totalTxns,
 		MedianTime:  medianTime,
-		TotalSupply: *totalSupply,
+
+		TotalSupply:    *totalSupply,
+		LastAbsnHeight: lastAbsnHeight,
+		LastAbsnSupply: *lastAbsnSupply,
 	}
 }
 
@@ -604,13 +609,17 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 	b.stateLock.RLock()
 	curTotalTxns := b.stateSnapshot.TotalTxns
 	totalSupply := b.stateSnapshot.TotalSupply
+	// TODO: calculate whether absorption occurs in this block
+	lastAbsnHeight := b.stateSnapshot.LastAbsnHeight
+	lastAbsnSupply := b.stateSnapshot.LastAbsnSupply
 	b.stateLock.RUnlock()
 	numTxns := uint64(len(block.MsgBlock().Transactions))
 	blockSize := uint64(block.MsgBlock().SerializeSize())
 	blockWeight := uint64(GetBlockWeight(block))
 	totalSupply.Add(&totalSupply, supplyChange)
 	state := newBestState(node, blockSize, blockWeight, numTxns,
-		curTotalTxns+numTxns, node.CalcPastMedianTime(), &totalSupply)
+		curTotalTxns+numTxns, node.CalcPastMedianTime(),
+		&totalSupply, &lastAbsnSupply, lastAbsnHeight)
 
 	// Atomically insert info into the database.
 	err = b.db.Update(func(dbTx database.Tx) error {
@@ -720,6 +729,9 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block,
 	b.stateLock.RLock()
 	curTotalTxns := b.stateSnapshot.TotalTxns
 	totalSupply := b.stateSnapshot.TotalSupply
+	// TODO: calculate whether absorption occurs in this block
+	lastAbsnHeight := b.stateSnapshot.LastAbsnHeight
+	lastAbsnSupply := b.stateSnapshot.LastAbsnSupply
 	b.stateLock.RUnlock()
 	numTxns := uint64(len(prevBlock.MsgBlock().Transactions))
 	blockSize := uint64(prevBlock.MsgBlock().SerializeSize())
@@ -727,7 +739,8 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block,
 	newTotalTxns := curTotalTxns - uint64(len(block.MsgBlock().Transactions))
 	totalSupply.Add(&totalSupply, supplyChange)
 	state := newBestState(prevNode, blockSize, blockWeight, numTxns,
-		newTotalTxns, prevNode.CalcPastMedianTime(), &totalSupply)
+		newTotalTxns, prevNode.CalcPastMedianTime(),
+		&totalSupply, &lastAbsnSupply, lastAbsnHeight)
 
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.

@@ -225,6 +225,14 @@ func (node *blockNode) CalcPastMedianTime() time.Time {
 	return time.Unix(medianTimestamp, 0)
 }
 
+// CalcPastMedianTime calculates the median time of the previous few blocks
+// prior to, and including, the block node.
+//
+// This function is safe for concurrent access.
+func (node *blockNode) CalcNextAbsorption() *big.Int {
+	return nil
+}
+
 // blockIndex provides facilities for keeping track of an in-memory index of the
 // block chain.  Although the name block chain suggests a single chain of
 // blocks, it is actually a tree-shaped structure where any node can have

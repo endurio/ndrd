@@ -924,11 +924,14 @@ func dbFetchHashByHeight(dbTx database.Tx, height int32) (*chainhash.Hash, error
 // bestChainState represents the data to be stored the database for the current
 // best chain state.
 type bestChainState struct {
-	hash        chainhash.Hash
-	height      uint32
-	totalTxns   uint64
-	workSum     *big.Int
-	totalSupply *big.Int
+	hash      chainhash.Hash
+	height    uint32
+	totalTxns uint64
+	workSum   *big.Int
+
+	totalSupply    *big.Int
+	lastAbsnHeight uint32
+	lastAbsnSupply *big.Int
 }
 
 // serializeBestChainState returns the serialization of the passed block best
@@ -939,8 +942,10 @@ func serializeBestChainState(state bestChainState) []byte {
 	workSumBytesLen := uint32(len(workSumBytes))
 	totalSupplyBytes := state.totalSupply.Bytes()
 	totalSupplyBytesLen := uint32(len(totalSupplyBytes))
-	serializedLen := chainhash.HashSize + 4 + 8 + 4 + 4 +
-		workSumBytesLen + totalSupplyBytesLen
+	lastAbsnSupplyBytes := state.lastAbsnSupply.Bytes()
+	lastAbsnSupplyBytesLen := uint32(len(lastAbsnSupplyBytes))
+	serializedLen := chainhash.HashSize + 4 + 8 + 4 + 4 + 4 + 4 +
+		workSumBytesLen + totalSupplyBytesLen + lastAbsnSupplyBytesLen
 
 	// Serialize the chain state.
 	serializedData := make([]byte, serializedLen)
@@ -950,6 +955,8 @@ func serializeBestChainState(state bestChainState) []byte {
 	offset += 4
 	byteOrder.PutUint64(serializedData[offset:], state.totalTxns)
 	offset += 8
+	byteOrder.PutUint32(serializedData[offset:], state.lastAbsnHeight)
+	offset += 4
 
 	byteOrder.PutUint32(serializedData[offset:], workSumBytesLen)
 	offset += 4
@@ -961,6 +968,11 @@ func serializeBestChainState(state bestChainState) []byte {
 	copy(serializedData[offset:], totalSupplyBytes)
 	offset += totalSupplyBytesLen
 
+	byteOrder.PutUint32(serializedData[offset:], lastAbsnSupplyBytesLen)
+	offset += 4
+	copy(serializedData[offset:], lastAbsnSupplyBytes)
+	offset += lastAbsnSupplyBytesLen
+
 	return serializedData[:]
 }
 
@@ -971,7 +983,7 @@ func serializeBestChainState(state bestChainState) []byte {
 func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 	// Ensure the serialized data has enough bytes to properly deserialize
 	// the hash, height, total transactions, and work sum length.
-	if len(serializedData) < chainhash.HashSize+4+8+4+4 {
+	if len(serializedData) < chainhash.HashSize+4+8+4+4+4+4 {
 		return bestChainState{}, database.Error{
 			ErrorCode:   database.ErrCorruption,
 			Description: "corrupt best chain state",
@@ -983,11 +995,13 @@ func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 	offset := uint32(chainhash.HashSize)
 	state.height = byteOrder.Uint32(serializedData[offset : offset+4])
 	offset += 4
+	state.lastAbsnHeight = byteOrder.Uint32(serializedData[offset : offset+4])
+	offset += 4
 	state.totalTxns = byteOrder.Uint64(serializedData[offset : offset+8])
 	offset += 8
+
 	workSumBytesLen := byteOrder.Uint32(serializedData[offset : offset+4])
 	offset += 4
-
 	// Ensure the serialized data has enough bytes to deserialize the work
 	// sum.
 	if uint32(len(serializedData[offset:])) < workSumBytesLen {
@@ -1009,7 +1023,6 @@ func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 	}
 	totalSupplyBytesLen := byteOrder.Uint32(serializedData[offset : offset+4])
 	offset += 4
-
 	// Ensure the serialized data has enough bytes to deserialize the total
 	// supply.
 	if uint32(len(serializedData[offset:])) < totalSupplyBytesLen {
@@ -1022,6 +1035,27 @@ func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 	offset += totalSupplyBytesLen
 	state.totalSupply = new(big.Int).SetBytes(totalSupplyBytes)
 
+	// Ensure the serialized data has enough bytes to deserialize the len.
+	if uint32(len(serializedData[offset:])) < 4 {
+		return bestChainState{}, database.Error{
+			ErrorCode:   database.ErrCorruption,
+			Description: "corrupt best chain state",
+		}
+	}
+	lastAbsnSupplyBytesLen := byteOrder.Uint32(serializedData[offset : offset+4])
+	offset += 4
+	// Ensure the serialized data has enough bytes to deserialize the lastAbsn
+	// supply.
+	if uint32(len(serializedData[offset:])) < lastAbsnSupplyBytesLen {
+		return bestChainState{}, database.Error{
+			ErrorCode:   database.ErrCorruption,
+			Description: "corrupt best chain state",
+		}
+	}
+	lastAbsnSupplyBytes := serializedData[offset : offset+lastAbsnSupplyBytesLen]
+	offset += lastAbsnSupplyBytesLen
+	state.lastAbsnSupply = new(big.Int).SetBytes(lastAbsnSupplyBytes)
+
 	return state, nil
 }
 
@@ -1030,11 +1064,13 @@ func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 func dbPutBestState(dbTx database.Tx, snapshot *BestState, workSum *big.Int) error {
 	// Serialize the current best chain state.
 	serializedData := serializeBestChainState(bestChainState{
-		hash:        snapshot.Hash,
-		height:      uint32(snapshot.Height),
-		totalTxns:   snapshot.TotalTxns,
-		workSum:     workSum,
-		totalSupply: &snapshot.TotalSupply,
+		hash:      snapshot.Hash,
+		height:    uint32(snapshot.Height),
+		totalTxns: snapshot.TotalTxns,
+		workSum:   workSum,
+
+		totalSupply:    &snapshot.TotalSupply,
+		lastAbsnHeight: uint32(snapshot.LastAbsnHeight),
 	})
 
 	// Store the current best chain state into the database.
@@ -1062,7 +1098,8 @@ func (b *BlockChain) createChainState() error {
 	blockSize := uint64(genesisBlock.MsgBlock().SerializeSize())
 	blockWeight := uint64(GetBlockWeight(genesisBlock))
 	b.stateSnapshot = newBestState(node, blockSize, blockWeight, numTxns,
-		numTxns, time.Unix(node.timestamp, 0), big.NewInt(chaincfg.PreminedSTB))
+		numTxns, time.Unix(node.timestamp, 0),
+		big.NewInt(chaincfg.PreminedSTB), new(big.Int), 0)
 
 	// Create the initial the database chain state including creating the
 	// necessary index buckets and inserting the genesis block.
@@ -1300,7 +1337,8 @@ func (b *BlockChain) initChainState() error {
 		blockWeight := uint64(GetBlockWeight(btcutil.NewBlock(&block)))
 		numTxns := uint64(len(block.Transactions))
 		b.stateSnapshot = newBestState(tip, blockSize, blockWeight,
-			numTxns, state.totalTxns, tip.CalcPastMedianTime(), state.totalSupply)
+			numTxns, state.totalTxns, tip.CalcPastMedianTime(),
+			state.totalSupply, state.lastAbsnSupply, int32(state.lastAbsnHeight))
 
 		return nil
 	})

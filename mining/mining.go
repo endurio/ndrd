@@ -527,8 +527,12 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress btcutil.Address) (*Bloc
 	}
 	coinbaseSigOpCost := int64(blockchain.CountSigOps(coinbaseTx)) * blockchain.WitnessScaleFactor
 
-	sourceOdrs := g.odrSource.MiningDescs(big.NewInt(13))
-	_ = sourceOdrs
+	absorption := g.chain.CalcNextAbsorption()
+	if absorption != nil {
+		// absorb the orders
+		sourceOdrs := g.odrSource.MiningDescs(absorption)
+		_ = sourceOdrs
+	}
 
 	// Get the current source transactions and create a priority queue to
 	// hold the transactions which are ready for inclusion into a block
