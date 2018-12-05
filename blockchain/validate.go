@@ -994,7 +994,7 @@ func CheckTransactionInputs(tx *btcutil.Tx, txHeight int32, utxoView *UtxoViewpo
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block,
-	view *UtxoViewpoint, stxos *[]SpentTxOut) (*big.Int, error) {
+	view *UtxoViewpoint, stxos *[]SpentTxOut) error {
 	// If the side chain blocks end up in the database, a call to
 	// CheckBlockSanity should be done here in case a previous version
 	// allowed a block that is no longer valid.  However, since the
@@ -1004,7 +1004,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block,
 	// Ensure the view is for the node being checked.
 	parentHash := &block.MsgBlock().Header.PrevBlock
 	if !view.BestHash().IsEqual(parentHash) {
-		return nil, AssertError(fmt.Sprintf("inconsistent view when "+
+		return AssertError(fmt.Sprintf("inconsistent view when "+
 			"checking block connection: best hash is %v instead "+
 			"of expected %v", view.BestHash(), parentHash))
 	}
@@ -1028,7 +1028,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block,
 	if !isBIP0030Node(node) && (node.height < b.chainParams.BIP0034Height) {
 		err := b.checkBIP0030(node, block, view)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
@@ -1039,7 +1039,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block,
 	// transaction inputs, counting pay-to-script-hashes, and scripts.
 	err := view.fetchInputUtxos(b.db, block)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// BIP0016 describes a pay-to-script-hash type that is considered a
@@ -1053,7 +1053,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block,
 	// the new rules.
 	segwitState, err := b.deploymentState(node.parent, chaincfg.DeploymentSegwit)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	enforceSegWit := segwitState == ThresholdActive
 
@@ -1075,7 +1075,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block,
 		sigOpCost, err := GetSigOpCost(tx, i == 0, view, enforceBIP0016,
 			enforceSegWit)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		// Check for overflow or going over the limits.  We have to do
@@ -1086,11 +1086,9 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block,
 			str := fmt.Sprintf("block contains too many "+
 				"signature operations - got %v, max %v",
 				totalSigOpCost, MaxBlockSigOpsCost)
-			return nil, ruleError(ErrTooManySigOps, str)
+			return ruleError(ErrTooManySigOps, str)
 		}
 	}
-
-	totalBalanceSTB := new(big.Int)
 
 	// Perform several checks on the inputs for each transaction.  Also
 	// accumulate the total fees.  This could technically be combined with
@@ -1104,7 +1102,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block,
 		txBalances, err := CheckTransactionInputs(tx, node.height, view,
 			b.chainParams)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		if IsCoinBase(tx) {
@@ -1121,7 +1119,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block,
 					(txBalance < 0 && totalTxBalance > lastTotalTxBalance) {
 					str := fmt.Sprintf("total balance of %v for block "+
 						"overflows accumulator", token)
-					return nil, ruleError(ErrBadFees, str)
+					return ruleError(ErrBadFees, str)
 				}
 				totalTxBalances[token] = totalTxBalance
 			}
@@ -1131,11 +1129,10 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block,
 		// provably unspendable as available utxos.  Also, the passed
 		// spent txos slice is updated to contain an entry for each
 		// spent txout in the order each transaction spends them.
-		balanceSTB, err := view.connectTransaction(tx, node.height, stxos)
+		_, err = view.connectTransaction(tx, node.height, stxos)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		totalBalanceSTB.Add(totalBalanceSTB, big.NewInt(balanceSTB))
 	}
 
 	// The total output values of the coinbase transaction must not exceed
@@ -1157,7 +1154,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block,
 			str := fmt.Sprintf("coinbase transaction of %v for block pays %v "+
 				"which is more than expected value of %v",
 				token, totalSatoshiOut[token], expectedSatoshiOut)
-			return nil, ruleError(ErrBadCoinbaseValue, str)
+			return ruleError(ErrBadCoinbaseValue, str)
 		}
 	}
 
@@ -1197,7 +1194,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block,
 	// the soft-fork deployment is fully active.
 	csvState, err := b.deploymentState(node.parent, chaincfg.DeploymentCSV)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if csvState == ThresholdActive {
 		// If the CSV soft-fork is now active, then modify the
@@ -1220,14 +1217,14 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block,
 			sequenceLock, err := b.calcSequenceLock(node, tx, view,
 				false)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			if !SequenceLockActive(sequenceLock, node.height,
 				medianTime) {
 				str := fmt.Sprintf("block contains " +
 					"transaction whose input sequence " +
 					"locks are not met")
-				return nil, ruleError(ErrUnfinalizedTx, str)
+				return ruleError(ErrUnfinalizedTx, str)
 			}
 		}
 	}
@@ -1247,7 +1244,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block,
 		err := checkBlockScripts(block, view, scriptFlags, b.sigCache,
 			b.hashCache)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
@@ -1255,7 +1252,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block,
 	// transactions have been connected.
 	view.SetBestHash(&node.hash)
 
-	return totalBalanceSTB, nil
+	return nil
 }
 
 // CheckConnectBlockTemplate fully validates that connecting the passed block to
@@ -1295,7 +1292,7 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *btcutil.Block, chainParams
 	view := NewUtxoViewpoint()
 	view.SetBestHash(&tip.hash)
 	newNode := newBlockNode(&header, tip)
-	_, err = b.checkConnectBlock(newNode, block, view, nil)
+	err = b.checkConnectBlock(newNode, block, view, nil)
 	return err
 }
 

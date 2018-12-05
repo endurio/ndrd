@@ -10,6 +10,11 @@ import (
 	"math/big"
 )
 
+var (
+	// BigZero is a zero big.Int
+	BigZero = big.Int{}
+)
+
 // calculate the median price for the nextPrice chained after the block node.
 func calcMedianPrice(node *blockNode, epoch int32) float64 {
 	if node == nil || node.height+1 < epoch {

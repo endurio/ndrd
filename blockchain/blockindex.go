@@ -34,6 +34,8 @@ const (
 	// has failed validation, thus the block is also invalid.
 	statusInvalidAncestor
 
+	statusAbsorption
+
 	// statusNone indicates that the block has no validation state flags set.
 	//
 	// NOTE: This must be defined last in order to avoid influencing iota.
@@ -59,6 +61,11 @@ func (status blockStatus) KnownValid() bool {
 // invalid yet.
 func (status blockStatus) KnownInvalid() bool {
 	return status&(statusValidateFailed|statusInvalidAncestor) != 0
+}
+
+// Absorption returns whether the block triggers an new absorption.
+func (status blockStatus) Absorption() bool {
+	return status&statusAbsorption != 0
 }
 
 // blockNode represents a block within the block chain and is primarily used to
@@ -96,6 +103,7 @@ type blockNode struct {
 	merkleRoot chainhash.Hash
 
 	priceDerivation Price
+	supplyChange    *big.Int // STB supply change in this block.
 	signature       btcec.CompactSignature
 
 	// status is a bitfield representing the validation state of the block. The
@@ -119,6 +127,7 @@ func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *block
 		timestamp:       blockHeader.Timestamp.Unix(),
 		merkleRoot:      blockHeader.MerkleRoot,
 		priceDerivation: Price(blockHeader.PriceDerivation),
+		supplyChange:    nil,
 		signature:       blockHeader.Signature,
 	}
 	if parent != nil {
@@ -331,6 +340,16 @@ func (bi *blockIndex) SetStatusFlags(node *blockNode, flags blockStatus) {
 func (bi *blockIndex) UnsetStatusFlags(node *blockNode, flags blockStatus) {
 	bi.Lock()
 	node.status &^= flags
+	bi.dirty[node] = struct{}{}
+	bi.Unlock()
+}
+
+// SetSupplyChange f...
+//
+// This function is safe for concurrent access.
+func (bi *blockIndex) SetSupplyChange(node *blockNode, supplyChange *big.Int) {
+	bi.Lock()
+	node.supplyChange = supplyChange
 	bi.dirty[node] = struct{}{}
 	bi.Unlock()
 }

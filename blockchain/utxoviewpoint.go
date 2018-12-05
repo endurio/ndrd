@@ -331,13 +331,11 @@ func (view *UtxoViewpoint) fetchEntryByHash(db database.DB, hash *chainhash.Hash
 // using the provided spent txo information, and setting the best hash for the
 // view to the block before the passed block.
 func (view *UtxoViewpoint) disconnectTransactions(db database.DB, block *btcutil.Block,
-	stxos []SpentTxOut) (*big.Int, error) {
-
-	balance := new(big.Int)
+	stxos []SpentTxOut) error {
 
 	// Sanity check the correct number of stxos are provided.
 	if len(stxos) != countSpentOutputs(block) {
-		return nil, AssertError("disconnectTransactions called with bad " +
+		return AssertError("disconnectTransactions called with bad " +
 			"spent transaction out information")
 	}
 
@@ -388,11 +386,6 @@ func (view *UtxoViewpoint) disconnectTransactions(db database.DB, block *btcutil
 			}
 
 			entry.Spend()
-
-			if entry.TokenID() == wire.STB {
-				// subtract from the STB supply
-				balance.Sub(balance, big.NewInt(entry.Amount()))
-			}
 		}
 
 		// Loop backwards through all of the transaction inputs (except
@@ -439,10 +432,10 @@ func (view *UtxoViewpoint) disconnectTransactions(db database.DB, block *btcutil
 			if stxo.Height == 0 {
 				utxo, err := view.fetchEntryByHash(db, txHash)
 				if err != nil {
-					return nil, err
+					return err
 				}
 				if utxo == nil {
-					return nil, AssertError(fmt.Sprintf("unable "+
+					return AssertError(fmt.Sprintf("unable "+
 						"to resurrect legacy stxo %v", *originOut))
 				}
 
@@ -459,18 +452,13 @@ func (view *UtxoViewpoint) disconnectTransactions(db database.DB, block *btcutil
 			if stxo.IsCoinBase {
 				entry.packedFlags |= tfCoinBase
 			}
-
-			if entry.TokenID() == wire.STB {
-				// add to the STB supply
-				balance.Add(balance, big.NewInt(entry.Amount()))
-			}
 		}
 	}
 
 	// Update the best hash for view to the previous block since all of the
 	// transactions for the current block have been disconnected.
 	view.SetBestHash(&block.MsgBlock().Header.PrevBlock)
-	return balance, nil
+	return nil
 }
 
 // RemoveEntry removes the given transaction output from the current state of

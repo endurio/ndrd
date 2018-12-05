@@ -929,9 +929,7 @@ type bestChainState struct {
 	totalTxns uint64
 	workSum   *big.Int
 
-	totalSupply    *big.Int
-	lastAbsnHeight uint32
-	lastAbsnSupply *big.Int
+	totalSupply *big.Int
 }
 
 // serializeBestChainState returns the serialization of the passed block best
@@ -942,10 +940,8 @@ func serializeBestChainState(state bestChainState) []byte {
 	workSumBytesLen := uint32(len(workSumBytes))
 	totalSupplyBytes := state.totalSupply.Bytes()
 	totalSupplyBytesLen := uint32(len(totalSupplyBytes))
-	lastAbsnSupplyBytes := state.lastAbsnSupply.Bytes()
-	lastAbsnSupplyBytesLen := uint32(len(lastAbsnSupplyBytes))
-	serializedLen := chainhash.HashSize + 4 + 8 + 4 + 4 + 4 + 4 +
-		workSumBytesLen + totalSupplyBytesLen + lastAbsnSupplyBytesLen
+	serializedLen := chainhash.HashSize + 4 + 8 + 4 + 4 +
+		workSumBytesLen + totalSupplyBytesLen
 
 	// Serialize the chain state.
 	serializedData := make([]byte, serializedLen)
@@ -955,8 +951,6 @@ func serializeBestChainState(state bestChainState) []byte {
 	offset += 4
 	byteOrder.PutUint64(serializedData[offset:], state.totalTxns)
 	offset += 8
-	byteOrder.PutUint32(serializedData[offset:], state.lastAbsnHeight)
-	offset += 4
 
 	byteOrder.PutUint32(serializedData[offset:], workSumBytesLen)
 	offset += 4
@@ -968,11 +962,6 @@ func serializeBestChainState(state bestChainState) []byte {
 	copy(serializedData[offset:], totalSupplyBytes)
 	offset += totalSupplyBytesLen
 
-	byteOrder.PutUint32(serializedData[offset:], lastAbsnSupplyBytesLen)
-	offset += 4
-	copy(serializedData[offset:], lastAbsnSupplyBytes)
-	offset += lastAbsnSupplyBytesLen
-
 	return serializedData[:]
 }
 
@@ -983,7 +972,7 @@ func serializeBestChainState(state bestChainState) []byte {
 func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 	// Ensure the serialized data has enough bytes to properly deserialize
 	// the hash, height, total transactions, and work sum length.
-	if len(serializedData) < chainhash.HashSize+4+8+4+4+4+4 {
+	if len(serializedData) < chainhash.HashSize+4+8+4+4 {
 		return bestChainState{}, database.Error{
 			ErrorCode:   database.ErrCorruption,
 			Description: "corrupt best chain state",
@@ -994,8 +983,6 @@ func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 	copy(state.hash[:], serializedData[0:chainhash.HashSize])
 	offset := uint32(chainhash.HashSize)
 	state.height = byteOrder.Uint32(serializedData[offset : offset+4])
-	offset += 4
-	state.lastAbsnHeight = byteOrder.Uint32(serializedData[offset : offset+4])
 	offset += 4
 	state.totalTxns = byteOrder.Uint64(serializedData[offset : offset+8])
 	offset += 8
@@ -1035,27 +1022,6 @@ func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 	offset += totalSupplyBytesLen
 	state.totalSupply = new(big.Int).SetBytes(totalSupplyBytes)
 
-	// Ensure the serialized data has enough bytes to deserialize the len.
-	if uint32(len(serializedData[offset:])) < 4 {
-		return bestChainState{}, database.Error{
-			ErrorCode:   database.ErrCorruption,
-			Description: "corrupt best chain state",
-		}
-	}
-	lastAbsnSupplyBytesLen := byteOrder.Uint32(serializedData[offset : offset+4])
-	offset += 4
-	// Ensure the serialized data has enough bytes to deserialize the lastAbsn
-	// supply.
-	if uint32(len(serializedData[offset:])) < lastAbsnSupplyBytesLen {
-		return bestChainState{}, database.Error{
-			ErrorCode:   database.ErrCorruption,
-			Description: "corrupt best chain state",
-		}
-	}
-	lastAbsnSupplyBytes := serializedData[offset : offset+lastAbsnSupplyBytesLen]
-	offset += lastAbsnSupplyBytesLen
-	state.lastAbsnSupply = new(big.Int).SetBytes(lastAbsnSupplyBytes)
-
 	return state, nil
 }
 
@@ -1069,8 +1035,7 @@ func dbPutBestState(dbTx database.Tx, snapshot *BestState, workSum *big.Int) err
 		totalTxns: snapshot.TotalTxns,
 		workSum:   workSum,
 
-		totalSupply:    &snapshot.TotalSupply,
-		lastAbsnHeight: uint32(snapshot.LastAbsnHeight),
+		totalSupply: &snapshot.TotalSupply,
 	})
 
 	// Store the current best chain state into the database.
@@ -1087,6 +1052,7 @@ func (b *BlockChain) createChainState() error {
 	header := &genesisBlock.MsgBlock().Header
 	node := newBlockNode(header, nil)
 	node.status = statusDataStored | statusValid
+	node.supplyChange = &BigZero
 	b.bestChain.SetTip(node)
 
 	// Add the new node to the index which is used for faster lookups.
@@ -1099,7 +1065,7 @@ func (b *BlockChain) createChainState() error {
 	blockWeight := uint64(GetBlockWeight(genesisBlock))
 	b.stateSnapshot = newBestState(node, blockSize, blockWeight, numTxns,
 		numTxns, time.Unix(node.timestamp, 0),
-		big.NewInt(chaincfg.PreminedSTB), new(big.Int), 0)
+		big.NewInt(chaincfg.PreminedSTB))
 
 	// Create the initial the database chain state including creating the
 	// necessary index buckets and inserting the genesis block.
@@ -1254,7 +1220,7 @@ func (b *BlockChain) initChainState() error {
 		var lastNode *blockNode
 		cursor = blockIndexBucket.Cursor()
 		for ok := cursor.First(); ok; ok = cursor.Next() {
-			header, status, err := deserializeBlockRow(cursor.Value())
+			header, status, supplyChange, err := deserializeBlockRow(cursor.Value())
 			if err != nil {
 				return err
 			}
@@ -1287,6 +1253,7 @@ func (b *BlockChain) initChainState() error {
 			// and add it to the block index.
 			node := &blockNodes[i]
 			initBlockNode(node, header, parent)
+			node.supplyChange = supplyChange
 			node.status = status
 			b.index.addNode(node)
 
@@ -1338,7 +1305,7 @@ func (b *BlockChain) initChainState() error {
 		numTxns := uint64(len(block.Transactions))
 		b.stateSnapshot = newBestState(tip, blockSize, blockWeight,
 			numTxns, state.totalTxns, tip.CalcPastMedianTime(),
-			state.totalSupply, state.lastAbsnSupply, int32(state.lastAbsnHeight))
+			state.totalSupply)
 
 		return nil
 	})
@@ -1354,21 +1321,25 @@ func (b *BlockChain) initChainState() error {
 
 // deserializeBlockRow parses a value in the block index bucket into a block
 // header and block status bitfield.
-func deserializeBlockRow(blockRow []byte) (*wire.BlockHeader, blockStatus, error) {
+func deserializeBlockRow(blockRow []byte) (*wire.BlockHeader, blockStatus, *big.Int, error) {
 	buffer := bytes.NewReader(blockRow)
 
 	var header wire.BlockHeader
 	err := header.Deserialize(buffer)
 	if err != nil {
-		return nil, statusNone, err
+		return nil, statusNone, nil, err
 	}
 
 	statusByte, err := buffer.ReadByte()
 	if err != nil {
-		return nil, statusNone, err
+		return nil, statusNone, nil, err
 	}
 
-	return &header, blockStatus(statusByte), nil
+	supplyChangeBytes, err := wire.ReadVarBytes(buffer, 0, 64, "supplyChange")
+	if err != nil {
+		return nil, statusNone, nil, err
+	}
+	return &header, blockStatus(statusByte), new(big.Int).SetBytes(supplyChangeBytes), nil
 }
 
 // dbFetchHeaderByHash uses an existing database transaction to retrieve the
@@ -1423,7 +1394,13 @@ func dbFetchBlockByNode(dbTx database.Tx, node *blockNode) (*btcutil.Block, erro
 // index bucket. This overwrites the current entry if there exists one.
 func dbStoreBlockNode(dbTx database.Tx, node *blockNode) error {
 	// Serialize block data to be stored.
-	w := bytes.NewBuffer(make([]byte, 0, blockHdrSize+1))
+	dataLen := blockHdrSize + 1
+
+	supplyChangeBytes := node.supplyChange.Bytes()
+	len := len(supplyChangeBytes)
+	dataLen += wire.VarIntSerializeSize(uint64(len)) + len
+
+	w := bytes.NewBuffer(make([]byte, 0, dataLen))
 	header := node.Header()
 	err := header.Serialize(w)
 	if err != nil {
@@ -1433,6 +1410,12 @@ func dbStoreBlockNode(dbTx database.Tx, node *blockNode) error {
 	if err != nil {
 		return err
 	}
+
+	err = wire.WriteVarBytes(w, 0, supplyChangeBytes)
+	if err != nil {
+		return err
+	}
+
 	value := w.Bytes()
 
 	// Write block header data to block index bucket.
