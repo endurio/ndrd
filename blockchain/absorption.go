@@ -5,6 +5,7 @@
 package blockchain
 
 import (
+	"errors"
 	"math"
 	"math/big"
 )
@@ -37,55 +38,56 @@ func calcMedianPrice(node *blockNode, epoch int32) float64 {
 	return sum / float64(count)
 }
 
-// CalcNextAbsorptionRate calculates the absorption for the block
-// after the end of the current best chain based on the price history.
+// CheckNewAbsorptionRate check if the new block will trigger a new absorptioin.
 //
 // This function is safe for concurrent access.
-func (b *BlockChain) CalcNextAbsorptionRate() Price {
+func (b *BlockChain) CheckNewAbsorptionRate(node *blockNode) (float64, error) {
 	b.chainLock.RLock()
 	b.stateLock.RLock()
 	defer b.stateLock.RUnlock()
 	defer b.chainLock.RUnlock()
-	return Price(b.calcNextAbsorptionRate())
+	return b.checkNewAbsorptionRate(node)
 }
 
 // calcNextAbsorptionRate calculates the absorption for the block
 // after the end of the current best chain based on the price history.
-func (b *BlockChain) calcNextAbsorptionRate() float64 {
-	tip := b.bestChain.Tip()
-	// Genesis block.
-	if tip == nil {
-		return math.NaN()
+func (b *BlockChain) checkNewAbsorptionRate(node *blockNode) (float64, error) {
+	epoch := b.chainParams.BlockPerTimespan
+	if node.height < epoch-1 {
+		// no absorption in the first epoch
+		return math.NaN(), nil
 	}
 
-	epoch := b.chainParams.BlockPerTimespan
+	if node.parent != b.bestChain.Tip() {
+		return math.NaN(), errors.New("node does not connect to the best chain")
+	}
 
-	medianPrice := calcMedianPrice(tip, epoch)
+	medianPrice := calcMedianPrice(node, epoch)
 	if math.IsNaN(medianPrice) {
-		return math.NaN()
+		return math.NaN(), nil
 	}
 
 	lastAbsnHeight := b.stateSnapshot.LastAbsnHeight
-	if tip.height-lastAbsnHeight >= epoch {
+	if node.height-lastAbsnHeight >= epoch {
 		// passive condition: 1 epoch without any active absorption
 		// or absorption never occurs, wait for the first epoch pass
-		return medianPrice
+		return medianPrice, nil
 	}
 
 	// check for active condition
 	lastAbsnNode := b.bestChain.NodeByHeight(lastAbsnHeight)
 	lastAbsnMedianPrice := calcMedianPrice(lastAbsnNode, epoch)
 	if math.IsNaN(lastAbsnMedianPrice) {
-		return medianPrice
+		return medianPrice, nil
 	}
 
 	priceRate := medianPrice / lastAbsnMedianPrice
 	if priceRate >= 2 || priceRate <= -0.5 {
 		// active absorption
-		return medianPrice
+		return medianPrice, nil
 	}
 
-	return math.NaN()
+	return math.NaN(), nil
 }
 
 // CalcNextAbsorption calculates the next absorption amount of STB

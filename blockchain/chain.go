@@ -8,6 +8,7 @@ package blockchain
 import (
 	"container/list"
 	"fmt"
+	"math"
 	"math/big"
 	"sync"
 	"time"
@@ -609,7 +610,6 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 	b.stateLock.RLock()
 	curTotalTxns := b.stateSnapshot.TotalTxns
 	totalSupply := b.stateSnapshot.TotalSupply
-	// TODO: calculate whether absorption occurs in this block
 	lastAbsnHeight := b.stateSnapshot.LastAbsnHeight
 	lastAbsnSupply := b.stateSnapshot.LastAbsnSupply
 	b.stateLock.RUnlock()
@@ -617,6 +617,18 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 	blockSize := uint64(block.MsgBlock().SerializeSize())
 	blockWeight := uint64(GetBlockWeight(block))
 	totalSupply.Add(&totalSupply, supplyChange)
+
+	// check if a new absorption should occur in this block
+	rate, err := b.CheckNewAbsorptionRate(node)
+	if err != nil {
+		return err
+	}
+	if !math.IsNaN(rate) {
+		// triggered, update the last absorption data
+		lastAbsnHeight = node.height
+		lastAbsnSupply = totalSupply
+	}
+
 	state := newBestState(node, blockSize, blockWeight, numTxns,
 		curTotalTxns+numTxns, node.CalcPastMedianTime(),
 		&totalSupply, &lastAbsnSupply, lastAbsnHeight)
@@ -729,7 +741,6 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block,
 	b.stateLock.RLock()
 	curTotalTxns := b.stateSnapshot.TotalTxns
 	totalSupply := b.stateSnapshot.TotalSupply
-	// TODO: calculate whether absorption occurs in this block
 	lastAbsnHeight := b.stateSnapshot.LastAbsnHeight
 	lastAbsnSupply := b.stateSnapshot.LastAbsnSupply
 	b.stateLock.RUnlock()
@@ -738,6 +749,7 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *btcutil.Block,
 	blockWeight := uint64(GetBlockWeight(prevBlock))
 	newTotalTxns := curTotalTxns - uint64(len(block.MsgBlock().Transactions))
 	totalSupply.Add(&totalSupply, supplyChange)
+	// TODO: calculate whether absorption occurs in this block
 	state := newBestState(prevNode, blockSize, blockWeight, numTxns,
 		newTotalTxns, prevNode.CalcPastMedianTime(),
 		&totalSupply, &lastAbsnSupply, lastAbsnHeight)
