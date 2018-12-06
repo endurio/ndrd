@@ -9,12 +9,12 @@ remove=0
 daemon=1
 wallet=1
 first=0
-trace=0
+loglevel=
 
-while getopts "h?frdwt" opt; do
+while getopts "h?frdwl:" opt; do
     case "$opt" in
     h|\?)
-        echo "$(basename ""$0"") [-h] [-?] [-f|-r] [-d|-w] [-t] nodes_count"
+        echo "$(basename ""$0"") [-h] [-?] [-f|-r] [-d|-w] [-l loglevel] nodes_count"
         exit 0
         ;;
 	r)	remove=1
@@ -26,7 +26,7 @@ while getopts "h?frdwt" opt; do
 		;;
 	w)	daemon=0
 		;;
-	t)	trace=1
+	l)	loglevel=$OPTARG
 		;;
     esac
 done
@@ -67,9 +67,9 @@ fi
 rm -rf "$LOCALAPPDATA/btcwalletTMP/simnet"
 rm -rf "$LOCALAPPDATA/btcwalletTMP/logs/simnet"
 
-if [[ $trace -ne 0 ]]; then
-	BTCD="$BTCD --debuglevel=trace"
-	BTCW="$BTCW --debuglevel=trace"
+if [[ ! -z "$loglevel" ]]; then
+	BTCD="$BTCD --debuglevel=$loglevel"
+	BTCW="$BTCW --debuglevel=$loglevel"
 fi
 
 if [[ $daemon -ne 0 ]]; then
