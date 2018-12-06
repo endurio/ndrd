@@ -535,6 +535,7 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress btcutil.Address) (*Bloc
 	absorption := g.chain.CalcNextAbsorption()
 	if absorption != nil {
 		// absorb the orders
+		log.Infof("Absorption for %v of STB is required.", absorption.String())
 		sourceOdrs = g.odrSource.MiningDescs(absorption)
 		queueLen += len(sourceOdrs)
 	}
@@ -576,13 +577,15 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress btcutil.Address) (*Bloc
 	txFees = append(txFees, -1) // Updated once known
 	txSigOpCosts = append(txSigOpCosts, coinbaseSigOpCost)
 
-	log.Debugf("Considering %d orders for inclusion to new block",
-		len(sourceOdrs))
+	if sourceOdrs != nil {
+		log.Debugf("Considering %d orders for inclusion to new block",
+			len(sourceOdrs))
 
-	g.orderbookLoop(sourceOdrs, nextBlockHeight, dependers, priorityQueue, blockUtxos)
+		g.orderbookLoop(sourceOdrs, nextBlockHeight, dependers, priorityQueue, blockUtxos)
 
-	log.Tracef("Priority queue len %d, dependers len %d",
-		priorityQueue.Len(), len(dependers))
+		log.Tracef("Priority queue len %d, dependers len %d",
+			priorityQueue.Len(), len(dependers))
+	}
 
 	log.Debugf("Considering %d transactions for inclusion to new block",
 		len(sourceTxns))
