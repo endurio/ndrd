@@ -20,11 +20,11 @@ const (
 	epochTimeSpan = time.Hour * 24 * 7 / mvpTimeRate
 	blockPerEpoch = 1024 * 4
 	blockTime     = epochTimeSpan / blockPerEpoch
-	
+
 	// PreminedSTB defines the premined amount of STB.
 	PreminedSTB = 13 * 1e6 // btcutil.SatoshiPerBitcoin
 	// PreminedNDR defines the premined amount of NDR.
-	PreminedNDR = 6 * 1e6  // btcutil.SatoshiPerBitcoin
+	PreminedNDR = 6 * 1e6 // btcutil.SatoshiPerBitcoin
 )
 
 // These variables are the chain proof-of-work limit parameters for each default
@@ -491,9 +491,10 @@ var SimNetParams = Params{
 	BIP0066Height:            0, // Always active on simnet
 	CoinbaseMaturity:         0,
 	SubsidyReductionInterval: 210000,
-	TargetTimespan:           time.Hour * 24 * 14, // 14 days
-	TargetTimePerBlock:       time.Minute * 10,    // 10 minutes
-	RetargetAdjustmentFactor: 4,                   // 25% less, 400% more
+	BlockPerTimespan:         blockPerEpoch,
+	TargetTimespan:           epochTimeSpan, // 7 days
+	TargetTimePerBlock:       blockTime,     // Block time
+	RetargetAdjustmentFactor: 4,             // 25% less, 400% more
 	ReduceMinDifficulty:      true,
 	MinDiffReductionTime:     time.Minute * 20, // TargetTimePerBlock * 2
 	GenerateSupported:        true,
