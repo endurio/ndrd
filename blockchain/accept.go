@@ -68,7 +68,7 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 	newNode := newBlockNode(blockHeader, prevNode)
 	newNode.status = statusDataStored
 
-	rate, err := b.CheckNewAbsorptionRate(newNode)
+	rate, err := b.checkNewAbsorptionRate(newNode)
 	if !math.IsNaN(rate) {
 		b.index.SetStatusFlags(newNode, statusAbsorption)
 	}

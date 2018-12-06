@@ -613,7 +613,7 @@ func (b *BlockChain) connectBlock(node *blockNode, block *btcutil.Block,
 	totalSupply.Add(&totalSupply, node.supplyChange)
 
 	// check if a new absorption should occur in this block
-	rate, err := b.CheckNewAbsorptionRate(node)
+	rate, err := b.checkNewAbsorptionRate(node)
 	if err != nil {
 		return err
 	}
