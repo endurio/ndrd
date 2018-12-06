@@ -687,6 +687,7 @@ mempoolLoop:
 		blockchain.GetTransactionWeight(coinbaseTx))
 	blockSigOpCost := coinbaseSigOpCost
 	totalFees := int64(0)
+	accAbsorption := new(big.Int)
 
 	// Query the version bits state to see if segwit has been activated, if
 	// so then this means that we'll include any transactions with witness
@@ -834,15 +835,30 @@ mempoolLoop:
 			continue
 		}
 
-		for token, balance := range balances {
-			if balance > 0 {
-				// it's an order, not belong here
-				str := fmt.Sprintf("total %v value of all transaction inputs for "+
-					"transaction %v is less than the amount spent. Or perhaps it "+
-					"is an order instead.", token, tx.Hash())
+		balanceSTB := balances[wire.STB]
+		if balanceSTB > 0 || balances[wire.NDR] > 0 {
+			absnSign := absorption.Sign()
+			// it's an order
+			if absorption == nil || absnSign == 0 {
 				return nil, blockchain.RuleError{
-					ErrorCode:   blockchain.ErrSpendTooHigh,
-					Description: str,
+					ErrorCode:   blockchain.ErrBadAbsorption,
+					Description: "Order cannot be mined when there is no absorption.",
+				}
+			}
+
+			if absnSign > 0 && balanceSTB < 0 ||
+				absnSign < 0 && balanceSTB > 0 {
+				return nil, blockchain.RuleError{
+					ErrorCode:   blockchain.ErrBadAbsorption,
+					Description: "Wrong order direction to mine.",
+				}
+			}
+
+			accAbsorption.Add(accAbsorption, big.NewInt(balanceSTB))
+			if accAbsorption.Cmp(absorption) == absnSign {
+				return nil, blockchain.RuleError{
+					ErrorCode:   blockchain.ErrBadAbsorption,
+					Description: "Over absorbed.",
 				}
 			}
 		}
