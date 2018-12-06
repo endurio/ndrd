@@ -229,6 +229,9 @@ const (
 
 	// ErrNotAnOrder indicates the object is actually not and order.
 	ErrNotAnOrder
+
+	// ErrBadAbsorption indicates an invalid absorption orders in a block.
+	ErrBadAbsorption
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.
