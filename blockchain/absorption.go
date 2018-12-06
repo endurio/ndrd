@@ -84,7 +84,7 @@ func (b *BlockChain) checkNewAbsorptionRate(node *blockNode) (float64, error) {
 	}
 
 	absnNode, _ := findLastAbsorption(node, epoch)
-	if node.height-absnNode.height >= epoch {
+	if absnNode == nil || node.height-absnNode.height >= epoch {
 		// passive condition: 1 epoch without any active absorption
 		// or absorption never occurs, wait for the first epoch pass
 		return medianPrice, nil
