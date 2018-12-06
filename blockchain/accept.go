@@ -70,7 +70,8 @@ func (b *BlockChain) maybeAcceptBlock(block *btcutil.Block, flags BehaviorFlags)
 
 	rate, err := b.checkNewAbsorptionRate(newNode)
 	if !math.IsNaN(rate) {
-		log.Infof("Block %v triggered a new absorption with rate of %v", block.Hash(), rate)
+		log.Infof("A new absorption with rate %v is triggered by block height %v (%v)",
+			rate, block.Height(), block.Hash())
 		b.index.SetStatusFlags(newNode, statusAbsorption)
 	}
 

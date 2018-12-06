@@ -535,7 +535,7 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress btcutil.Address) (*Bloc
 	absorption := g.chain.CalcNextAbsorption()
 	if absorption != nil {
 		// absorb the orders
-		log.Infof("Absorption for %v of STB is required.", absorption.String())
+		log.Infof("Absorption for %v µSTB is required.", absorption)
 		sourceOdrs = g.odrSource.MiningDescs(absorption)
 		queueLen += len(sourceOdrs)
 	}
