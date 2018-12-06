@@ -40,11 +40,16 @@ MINING_ADDR=ame7CaXCbBV4YvpLUX3fNsGSd7y3ryBfKf
 MINING_SKEY=Fw28Hpjon65S4XT8uyfh7w7UFxWVExTs8oDyQZXwB1fTgwwzxnVY
 
 # command shortcuts
-START="start"
 CTL="ndrctl --simnet --rpcuser=a --rpcpass=a --skipverify"
 CTLW="$CTL --wallet"
 BTCD="btcd --simnet --rpcuser=a --rpcpass=a --miningkey=$MINING_SKEY"
 BTCW="btcwallet --simnet --connect=localhost --username=a --password=a --createtemp"
+
+# function
+function START {
+	"$@" &>/dev/null &
+	#start "$@"
+}
 
 # stop running daemon
 if [[ $wallet -ne 0 ]]; then
@@ -68,15 +73,15 @@ if [[ $trace -ne 0 ]]; then
 fi
 
 if [[ $daemon -ne 0 ]]; then
-	$START $BTCD
+	START $BTCD
 
 	if [[ $first -ne 0 ]]; then
-		$START $BTCW --appdata="$LOCALAPPDATA/btcwallet"
+		START $BTCW --appdata="$LOCALAPPDATA/btcwallet"
 		sleep 5
 		WALLET_ADDR=`$CTLW getnewaddress`
 		$CTLW stop
 
-		$START $BTCW --appdata="$LOCALAPPDATA/btcwalletTMP"
+		START $BTCW --appdata="$LOCALAPPDATA/btcwalletTMP"
 		sleep 5
 		$CTLW walletpassphrase "password" 0
 		$CTLW importprivkey $MINING_SKEY
@@ -90,12 +95,12 @@ if [[ $daemon -ne 0 ]]; then
 
 	# restart the daemon for persistent test
 	$CTL stop && sleep 3s
-	$START $BTCD
+	START $BTCD
 fi
 
 if [[ $wallet -ne 0 ]]; then
 	sleep 2
-	$START $BTCW --appdata="$LOCALAPPDATA/btcwallet"
+	START $BTCW --appdata="$LOCALAPPDATA/btcwallet"
 	sleep 5
 	$CTLW walletpassphrase "password" 0
 
@@ -114,3 +119,13 @@ if [[ $wallet -ne 0 ]]; then
 		$CTLW bid 0.$((RANDOM%5))$((RANDOM%9+1)) 1.$((RANDOM%2+8))$((RANDOM%10))
 	done
 fi
+
+# idle waiting for Ctrl-D from user
+echo "Ctrl-D to finish and stop all daemons.."
+$(</dev/stdin)
+
+# stop running daemons
+if [[ $wallet -ne 0 ]]; then
+	$CTLW stop 2>/dev/null | grep stopping && sleep 3s
+fi
+$CTL stop 2>/dev/null | grep stopping && sleep 3s
