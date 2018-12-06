@@ -1090,6 +1090,9 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block,
 		}
 	}
 
+	absorption := b.calcNextAbsorption()
+	accAbsorption := new(big.Int)
+
 	// Perform several checks on the inputs for each transaction.  Also
 	// accumulate the total fees.  This could technically be combined with
 	// the loop above instead of running another loop over the transactions,
@@ -1099,24 +1102,52 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *btcutil.Block,
 	// bounds.
 	var totalTxBalances = map[wire.TokenIdentity]int64{wire.STB: 0, wire.NDR: 0}
 	for _, tx := range transactions {
-		txBalances, err := CheckTransactionInputs(tx, node.height, view,
+		balances, err := CheckTransactionInputs(tx, node.height, view,
 			b.chainParams)
 		if err != nil {
 			return err
 		}
 
+		balanceSTB := balances[wire.STB]
+
 		if IsCoinBase(tx) {
 			// coinbase tx doesnot count to totalTxBalances (fee)
-		} else if txBalances[wire.STB] > 0 || txBalances[wire.NDR] > 0 {
-			// filled order doesnot count to totalTxBalances (fee)
+		} else if balanceSTB > 0 || balances[wire.NDR] > 0 {
+			// filled order count to accAbsorption instead
+			absnSign := absorption.Sign()
+			if absorption == nil || absnSign == 0 {
+				return RuleError{
+					ErrorCode:   ErrBadAbsorption,
+					Description: "Order cannot be mined when there is no absorption.",
+				}
+			}
+			if (absnSign > 0) != (balanceSTB > 0) {
+				return RuleError{
+					ErrorCode:   ErrBadAbsorption,
+					Description: "Wrong order direction to mine.",
+				}
+			}
+			if (balanceSTB > 0) == (balances[wire.NDR] > 0) {
+				return RuleError{
+					ErrorCode:   ErrBadAbsorption,
+					Description: "Invalid order: one token must be exchanged for the other.",
+				}
+			}
+			accAbsorption.Add(accAbsorption, big.NewInt(balanceSTB))
+			if accAbsorption.Cmp(absorption) == absnSign {
+				return RuleError{
+					ErrorCode:   ErrBadAbsorption,
+					Description: "Over absorbed.",
+				}
+			}
 		} else {
 			for token, lastTotalTxBalance := range totalTxBalances {
 				// Sum the total balance and ensure we don't overflow the
 				// accumulator.
-				txBalance := txBalances[token]
-				totalTxBalance := lastTotalTxBalance + txBalance
-				if (txBalance > 0 && totalTxBalance < lastTotalTxBalance) ||
-					(txBalance < 0 && totalTxBalance > lastTotalTxBalance) {
+				balance := balances[token]
+				totalTxBalance := lastTotalTxBalance + balance
+				if (balance > 0 && totalTxBalance < lastTotalTxBalance) ||
+					(balance < 0 && totalTxBalance > lastTotalTxBalance) {
 					str := fmt.Sprintf("total balance of %v for block "+
 						"overflows accumulator", token)
 					return ruleError(ErrBadFees, str)

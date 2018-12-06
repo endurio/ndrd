@@ -578,13 +578,14 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress btcutil.Address) (*Bloc
 	txSigOpCosts = append(txSigOpCosts, coinbaseSigOpCost)
 
 	if sourceOdrs != nil {
-		log.Debugf("Considering %d orders for inclusion to new block",
-			len(sourceOdrs))
-
-		g.orderbookLoop(sourceOdrs, nextBlockHeight, dependers, priorityQueue, blockUtxos)
-
-		log.Tracef("Priority queue len %d, dependers len %d",
-			priorityQueue.Len(), len(dependers))
+		if len(sourceOdrs) > 0 {
+			log.Debugf("Including %d orders to new block", len(sourceOdrs))
+			g.orderbookLoop(sourceOdrs, nextBlockHeight, dependers, priorityQueue, blockUtxos)
+			log.Tracef("Priority queue len %d, dependers len %d",
+				priorityQueue.Len(), len(dependers))
+		} else {
+			log.Debug("No appropriate orders for inclusion to new block")
+		}
 	}
 
 	log.Debugf("Considering %d transactions for inclusion to new block",
@@ -838,22 +839,24 @@ mempoolLoop:
 		balanceSTB := balances[wire.STB]
 		if balanceSTB > 0 || balances[wire.NDR] > 0 {
 			absnSign := absorption.Sign()
-			// it's an order
 			if absorption == nil || absnSign == 0 {
 				return nil, blockchain.RuleError{
 					ErrorCode:   blockchain.ErrBadAbsorption,
 					Description: "Order cannot be mined when there is no absorption.",
 				}
 			}
-
-			if absnSign > 0 && balanceSTB < 0 ||
-				absnSign < 0 && balanceSTB > 0 {
+			if (absnSign > 0) != (balanceSTB > 0) {
 				return nil, blockchain.RuleError{
 					ErrorCode:   blockchain.ErrBadAbsorption,
 					Description: "Wrong order direction to mine.",
 				}
 			}
-
+			if (balanceSTB > 0) == (balances[wire.NDR] > 0) {
+				return nil, blockchain.RuleError{
+					ErrorCode:   blockchain.ErrBadAbsorption,
+					Description: "Invalid order: one token must be exchanged for the other.",
+				}
+			}
 			accAbsorption.Add(accAbsorption, big.NewInt(balanceSTB))
 			if accAbsorption.Cmp(absorption) == absnSign {
 				return nil, blockchain.RuleError{
