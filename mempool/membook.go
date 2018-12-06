@@ -575,9 +575,9 @@ func (ob *OdrBook) MiningDescs(payout *big.Int) []*mining.OdrDesc {
 	ob.mtx.RLock()
 	defer ob.mtx.RUnlock()
 
-	orders := ob.bids
-	if payout.Sign() > 0 {
-		orders = ob.asks
+	orders := ob.asks
+	if payout.Sign() < 0 {
+		orders = ob.bids
 		payout = new(big.Int).Abs(payout)
 	}
 
@@ -603,7 +603,7 @@ func getOrdersForPayout(orders *list.List, payout *big.Int) ([]*OdrDesc, error) 
 
 	for e := orders.Front(); e != nil; e = e.Next() {
 		odrDesc := e.Value.(*OdrDesc)
-		remain.Sub(remain, big.NewInt(int64(odrDesc.Payout)))
+		remain.Sub(remain, big.NewInt(abs(int64(odrDesc.Payout))))
 		if remain.Sign() < 0 {
 			break
 		}
