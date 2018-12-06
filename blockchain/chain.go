@@ -70,9 +70,7 @@ type BestState struct {
 	TotalTxns   uint64         // The total number of txns in the chain.
 	MedianTime  time.Time      // Median time as per CalcPastMedianTime.
 
-	TotalSupply    big.Int // The total supply of STB in the chain.
-	LastAbsnHeight int32   // The height of last absorption block.
-	LastAbsnSupply big.Int // The total supply of STB in the last absorption block.
+	TotalSupply big.Int // The total supply of STB in the chain.
 }
 
 // newBestState returns a new best stats instance for the given parameters.

@@ -43,14 +43,25 @@ func calcMedianPrice(node *blockNode, epoch int32) float64 {
 	return sum / float64(count)
 }
 
+func findLastAbsorption(node *blockNode, epoch int32) (*blockNode, *big.Int) {
+	totalSupplyChange := new(big.Int)
+	for n := node; n != nil; n = n.parent {
+		if n.status.Absorption() {
+			return n, totalSupplyChange
+		}
+		totalSupplyChange.Add(totalSupplyChange, n.supplyChange)
+	}
+	return nil, nil
+}
+
 // CheckNewAbsorptionRate check if the new block will trigger a new absorptioin.
 //
 // This function is safe for concurrent access.
 func (b *BlockChain) CheckNewAbsorptionRate(node *blockNode) (float64, error) {
 	b.chainLock.RLock()
+	defer b.chainLock.RUnlock()
 	b.stateLock.RLock()
 	defer b.stateLock.RUnlock()
-	defer b.chainLock.RUnlock()
 	return b.checkNewAbsorptionRate(node)
 }
 
@@ -72,15 +83,15 @@ func (b *BlockChain) checkNewAbsorptionRate(node *blockNode) (float64, error) {
 		return math.NaN(), nil
 	}
 
-	lastAbsnHeight := b.stateSnapshot.LastAbsnHeight
-	if node.height-lastAbsnHeight >= epoch {
+	absnNode, _ := findLastAbsorption(node, epoch)
+	if node.height-absnNode.height >= epoch {
 		// passive condition: 1 epoch without any active absorption
 		// or absorption never occurs, wait for the first epoch pass
 		return medianPrice, nil
 	}
 
 	// check for active condition
-	lastAbsnNode := b.bestChain.NodeByHeight(lastAbsnHeight)
+	lastAbsnNode := b.bestChain.NodeByHeight(absnNode.height)
 	lastAbsnMedianPrice := calcMedianPrice(lastAbsnNode, epoch)
 	if math.IsNaN(lastAbsnMedianPrice) {
 		return medianPrice, nil
@@ -99,9 +110,9 @@ func (b *BlockChain) checkNewAbsorptionRate(node *blockNode) (float64, error) {
 // after the current best chain tip.
 func (b *BlockChain) CalcNextAbsorption() *big.Int {
 	b.chainLock.RLock()
+	defer b.chainLock.RUnlock()
 	b.stateLock.RLock()
 	defer b.stateLock.RUnlock()
-	defer b.chainLock.RUnlock()
 	return b.calcNextAbsorption()
 }
 
@@ -113,20 +124,24 @@ func (b *BlockChain) calcNextAbsorption() *big.Int {
 	}
 
 	epoch := b.chainParams.BlockPerTimespan
-	lastAbsnHeight := b.stateSnapshot.LastAbsnHeight
+	absnNode, alreadyAbsorbed := findLastAbsorption(tip, epoch)
+	if absnNode == nil {
+		// absorption never occurs
+		return nil
+	}
 
-	remainBlockToAbsorb := epoch - (tip.height - lastAbsnHeight)
+	b.stateLock.RLock()
+	lastAbsnSupply := b.stateSnapshot.TotalSupply
+	b.stateLock.RUnlock()
+
+	remainBlockToAbsorb := epoch - (tip.height - absnNode.height)
 	if remainBlockToAbsorb <= 0 {
 		// absorption only occurs for 1 week
 		return nil
 	}
 
-	lastAbsnSupply := b.stateSnapshot.LastAbsnSupply
-	alreadyAbsorbed := new(big.Int).Set(&b.stateSnapshot.TotalSupply)
-	alreadyAbsorbed.Sub(alreadyAbsorbed, &lastAbsnSupply)
-
-	lastAbsnNode := b.bestChain.NodeByHeight(lastAbsnHeight)
-	lastAbsnRate := calcMedianPrice(lastAbsnNode, epoch)
+	lastAbsnSupply.Sub(&lastAbsnSupply, alreadyAbsorbed)
+	lastAbsnRate := calcMedianPrice(absnNode, epoch)
 
 	lastAbsnFloat := new(big.Float).SetInt(&lastAbsnSupply)
 	lastAbsnFloat.Mul(lastAbsnFloat, big.NewFloat(lastAbsnRate))

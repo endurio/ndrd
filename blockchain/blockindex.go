@@ -127,7 +127,7 @@ func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *block
 		timestamp:       blockHeader.Timestamp.Unix(),
 		merkleRoot:      blockHeader.MerkleRoot,
 		priceDerivation: Price(blockHeader.PriceDerivation),
-		supplyChange:    nil,
+		supplyChange:    &BigZero,
 		signature:       blockHeader.Signature,
 	}
 	if parent != nil {
