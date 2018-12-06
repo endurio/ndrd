@@ -47,7 +47,7 @@ BTCW="btcwallet --simnet --connect=localhost --username=a --password=a --createt
 
 # function
 function START {
-	"$@" &>/dev/null &
+	"$@" >/dev/null &
 	#start "$@"
 }
 
