@@ -576,7 +576,7 @@ func (ob *OdrBook) MiningDescs(payout *big.Int) []*mining.OdrDesc {
 	defer ob.mtx.RUnlock()
 
 	orders := ob.bids
-	if payout.Sign() < 0 {
+	if payout.Sign() > 0 {
 		orders = ob.asks
 		payout = new(big.Int).Abs(payout)
 	}
