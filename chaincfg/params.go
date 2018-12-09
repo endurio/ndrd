@@ -22,9 +22,9 @@ const (
 	blockTime     = epochTimeSpan / blockPerEpoch
 
 	// PreminedSTB defines the premined amount of STB.
-	PreminedSTB = 13 * 1e6 // btcutil.SatoshiPerBitcoin
+	PreminedSTB = 1000 * 1e6 // btcutil.SatoshiPerBitcoin
 	// PreminedNDR defines the premined amount of NDR.
-	PreminedNDR = 6 * 1e6 // btcutil.SatoshiPerBitcoin
+	PreminedNDR = 130056556740610 // ~ 130 mil NDR
 )
 
 // These variables are the chain proof-of-work limit parameters for each default
