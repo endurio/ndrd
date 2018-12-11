@@ -24,8 +24,12 @@ iptables -P OUTPUT ACCEPT
 iptables -P INPUT DROP
 
 # save them
-iptables-save | sudo tee /etc/sysconfig/iptables
+#iptables-save | sudo tee /etc/sysconfig/iptables
+netfilter-persistent save
+iptables -S
 
 # restart the service
-service iptables restart
+#service iptables restart
+netfilter-persistent reload
+
 
