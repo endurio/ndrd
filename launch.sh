@@ -37,4 +37,4 @@ fi
 if [[ $remove -ne 0 ]]; then
 	rm -rf ~/.btcd/data/mainnet
 fi
-$BTCD --miningkey=`gpg -d ~/keys/a.gpg`
+$BTCD --miningkey=`scrypt dec ~/keys/ANxpQRnzNGhWEL3qvfn8siWsi1ai846fWr.s`
