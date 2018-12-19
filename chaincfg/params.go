@@ -243,7 +243,9 @@ var MainNetParams = Params{
 	Name:        "mainnet",
 	Net:         wire.MainNet,
 	DefaultPort: "8333",
-	DNSSeeds:    []DNSSeed{},
+	DNSSeeds: []DNSSeed{
+		{"seed.endur.io", true},
+	},
 
 	// Chain parameters
 	GenesisBlock:             &genesisBlock,
