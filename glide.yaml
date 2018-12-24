@@ -2,7 +2,7 @@ package: github.com/btcsuite/btcd
 import:
 - package: github.com/btcsuite/btclog
 - package: github.com/btcsuite/btcutil
-  repo: https://github.com/Zergity/btcutil.git
+  repo: https://github.com/endurio/btcutil.git
   version: mvp
   subpackages:
   - bloom

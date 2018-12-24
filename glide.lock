@@ -1,5 +1,5 @@
-hash: 438a280098633aad2e8c0bdbc0b5739f26d3b18bbbe7c0ebc1f9bea0d9eda45e
-updated: 2018-11-15T22:54:30.8149636+07:00
+hash: 77932e9bc659c08091d305eded69314944bf56ca88c566e0bb9f0ce0e557a266
+updated: 2018-12-25T01:48:16.8718697+07:00
 imports:
 - name: github.com/aead/siphash
   version: 83563a290f60225eb120d724600b9690c3fb536f
@@ -7,7 +7,7 @@ imports:
   version: 84c8d2346e9fc8c7b947e243b9c24e6df9fd206a
 - name: github.com/btcsuite/btcutil
   version: c63e648c23743051e03fe3619e0a708fd23d8137
-  repo: github.com/Zergity/btcutil
+  repo: https://github.com/endurio/btcutil.git
   subpackages:
   - base58
   - bech32
