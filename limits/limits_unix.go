@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2014 The endurio developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -16,7 +16,7 @@ const (
 	fileLimitMin  = 1024
 )
 
-// SetLimits raises some process limits to values which allow btcd and
+// SetLimits raises some process limits to values which allow ndrd and
 // associated utilities to run.
 func SetLimits() error {
 	var rLimit syscall.Rlimit

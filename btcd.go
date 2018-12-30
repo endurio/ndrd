@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2016 The btcsuite developers
+// Copyright (c) 2013-2016 The endurio developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -15,9 +15,9 @@ import (
 	"runtime/debug"
 	"runtime/pprof"
 
-	"github.com/btcsuite/btcd/blockchain/indexers"
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/limits"
+	"github.com/endurio/ndrd/blockchain/indexers"
+	"github.com/endurio/ndrd/database"
+	"github.com/endurio/ndrd/limits"
 )
 
 const (
@@ -31,11 +31,11 @@ var (
 	cfg *config
 )
 
-// winServiceMain is only invoked on Windows.  It detects when btcd is running
+// winServiceMain is only invoked on Windows.  It detects when ndrd is running
 // as a service and reacts accordingly.
 var winServiceMain func() (bool, error)
 
-// btcdMain is the real main function for btcd.  It is necessary to work around
+// btcdMain is the real main function for ndrd.  It is necessary to work around
 // the fact that deferred functions do not run when os.Exit() is called.  The
 // optional serverChan parameter is mainly used by the service code to be
 // notified with the server once it is setup so it can gracefully stop it when
@@ -87,7 +87,7 @@ func btcdMain(serverChan chan<- *server) error {
 		defer pprof.StopCPUProfile()
 	}
 
-	// Perform upgrades to btcd as new versions require it.
+	// Perform upgrades to ndrd as new versions require it.
 	if err := doUpgrades(); err != nil {
 		btcdLog.Errorf("%v", err)
 		return err

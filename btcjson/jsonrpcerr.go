@@ -1,4 +1,4 @@
-// Copyright (c) 2014 The btcsuite developers
+// Copyright (c) 2014 The endurio developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -78,7 +78,7 @@ const (
 	ErrRPCDecodeHexString   RPCErrorCode = -22
 )
 
-// Errors that are specific to btcd.
+// Errors that are specific to ndrd.
 const (
 	ErrRPCNoWallet      RPCErrorCode = -1
 	ErrRPCUnimplemented RPCErrorCode = -1

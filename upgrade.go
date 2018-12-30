@@ -1,4 +1,4 @@
-// Copyright (c) 2013-2014 The btcsuite developers
+// Copyright (c) 2013-2014 The endurio developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -28,20 +28,20 @@ func dirEmpty(dirPath string) (bool, error) {
 	return len(names) == 0, nil
 }
 
-// oldBtcdHomeDir returns the OS specific home directory btcd used prior to
-// version 0.3.3.  This has since been replaced with btcutil.AppDataDir, but
+// oldBtcdHomeDir returns the OS specific home directory ndrd used prior to
+// version 0.3.3.  This has since been replaced with util.AppDataDir, but
 // this function is still provided for the automatic upgrade path.
 func oldBtcdHomeDir() string {
 	// Search for Windows APPDATA first.  This won't exist on POSIX OSes.
 	appData := os.Getenv("APPDATA")
 	if appData != "" {
-		return filepath.Join(appData, "btcd")
+		return filepath.Join(appData, "ndrd")
 	}
 
 	// Fall back to standard HOME directory that works for most POSIX OSes.
 	home := os.Getenv("HOME")
 	if home != "" {
-		return filepath.Join(home, ".btcd")
+		return filepath.Join(home, ".ndrd")
 	}
 
 	// In the worst case, use the current directory.
@@ -49,7 +49,7 @@ func oldBtcdHomeDir() string {
 }
 
 // upgradeDBPathNet moves the database for a specific network from its
-// location prior to btcd version 0.2.0 and uses heuristics to ascertain the old
+// location prior to ndrd version 0.2.0 and uses heuristics to ascertain the old
 // database type to rename to the new format.
 func upgradeDBPathNet(oldDbPath, netName string) error {
 	// Prior to version 0.2.0, the database was named the same thing for
@@ -88,7 +88,7 @@ func upgradeDBPathNet(oldDbPath, netName string) error {
 	return nil
 }
 
-// upgradeDBPaths moves the databases from their locations prior to btcd
+// upgradeDBPaths moves the databases from their locations prior to ndrd
 // version 0.2.0 to their new locations.
 func upgradeDBPaths() error {
 	// Prior to version 0.2.0, the databases were in the "db" directory and
@@ -96,7 +96,7 @@ func upgradeDBPaths() error {
 	// respective networks.  Check for the old database and update it to the
 	// new path introduced with version 0.2.0 accordingly.
 	oldDbRoot := filepath.Join(oldBtcdHomeDir(), "db")
-	upgradeDBPathNet(filepath.Join(oldDbRoot, "btcd.db"), "mainnet")
+	upgradeDBPathNet(filepath.Join(oldDbRoot, "ndrd.db"), "mainnet")
 	upgradeDBPathNet(filepath.Join(oldDbRoot, "btcd_testnet.db"), "testnet")
 	upgradeDBPathNet(filepath.Join(oldDbRoot, "btcd_regtest.db"), "regtest")
 
@@ -104,7 +104,7 @@ func upgradeDBPaths() error {
 	return os.RemoveAll(oldDbRoot)
 }
 
-// upgradeDataPaths moves the application data from its location prior to btcd
+// upgradeDataPaths moves the application data from its location prior to ndrd
 // version 0.3.3 to its new location.
 func upgradeDataPaths() error {
 	// No need to migrate if the old and new home paths are the same.
@@ -124,7 +124,7 @@ func upgradeDataPaths() error {
 			return err
 		}
 
-		// Move old btcd.conf into new location if needed.
+		// Move old ndrd.conf into new location if needed.
 		oldConfPath := filepath.Join(oldHomePath, defaultConfigFilename)
 		newConfPath := filepath.Join(newHomePath, defaultConfigFilename)
 		if fileExists(oldConfPath) && !fileExists(newConfPath) {
@@ -165,7 +165,7 @@ func upgradeDataPaths() error {
 	return nil
 }
 
-// doUpgrades performs upgrades to btcd as new versions require it.
+// doUpgrades performs upgrades to ndrd as new versions require it.
 func doUpgrades() error {
 	err := upgradeDBPaths()
 	if err != nil {

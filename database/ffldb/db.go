@@ -1,4 +1,4 @@
-// Copyright (c) 2015-2016 The btcsuite developers
+// Copyright (c) 2015-2016 The endurio developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -14,18 +14,18 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/database"
-	"github.com/btcsuite/btcd/database/internal/treap"
-	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/goleveldb/leveldb"
 	"github.com/btcsuite/goleveldb/leveldb/comparer"
 	ldberrors "github.com/btcsuite/goleveldb/leveldb/errors"
 	"github.com/btcsuite/goleveldb/leveldb/filter"
 	"github.com/btcsuite/goleveldb/leveldb/iterator"
 	"github.com/btcsuite/goleveldb/leveldb/opt"
-	"github.com/btcsuite/goleveldb/leveldb/util"
+	ldbutil "github.com/btcsuite/goleveldb/leveldb/util"
+	"github.com/endurio/ndrd/chaincfg/chainhash"
+	"github.com/endurio/ndrd/database"
+	"github.com/endurio/ndrd/database/internal/treap"
+	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/wire"
 )
 
 const (
@@ -494,7 +494,7 @@ func newCursor(b *bucket, bucketID []byte, cursorTyp cursorType) *cursor {
 	var dbIter, pendingIter iterator.Iterator
 	switch cursorTyp {
 	case ctKeys:
-		keyRange := util.BytesPrefix(bucketID)
+		keyRange := ldbutil.BytesPrefix(bucketID)
 		dbIter = b.tx.snapshot.NewIterator(keyRange)
 		pendingKeyIter := newLdbTreapIter(b.tx, keyRange)
 		pendingIter = pendingKeyIter
@@ -509,7 +509,7 @@ func newCursor(b *bucket, bucketID []byte, cursorTyp cursorType) *cursor {
 		prefix := make([]byte, len(bucketIndexPrefix)+4)
 		copy(prefix, bucketIndexPrefix)
 		copy(prefix[len(bucketIndexPrefix):], bucketID)
-		bucketRange := util.BytesPrefix(prefix)
+		bucketRange := ldbutil.BytesPrefix(prefix)
 
 		dbIter = b.tx.snapshot.NewIterator(bucketRange)
 		pendingBucketIter := newLdbTreapIter(b.tx, bucketRange)
@@ -523,8 +523,8 @@ func newCursor(b *bucket, bucketID []byte, cursorTyp cursorType) *cursor {
 		prefix := make([]byte, len(bucketIndexPrefix)+4)
 		copy(prefix, bucketIndexPrefix)
 		copy(prefix[len(bucketIndexPrefix):], bucketID)
-		bucketRange := util.BytesPrefix(prefix)
-		keyRange := util.BytesPrefix(bucketID)
+		bucketRange := ldbutil.BytesPrefix(prefix)
+		keyRange := ldbutil.BytesPrefix(bucketID)
 
 		// Since both keys and buckets are needed from the database,
 		// create an individual iterator for each prefix and then create
@@ -1146,7 +1146,7 @@ func (tx *transaction) hasBlock(hash *chainhash.Hash) bool {
 //   - ErrTxClosed if the transaction has already been closed
 //
 // This function is part of the database.Tx interface implementation.
-func (tx *transaction) StoreBlock(block *btcutil.Block) error {
+func (tx *transaction) StoreBlock(block *util.Block) error {
 	// Ensure transaction state is valid.
 	if err := tx.checkClosed(); err != nil {
 		return err
