@@ -39,7 +39,7 @@ func (oD *OdrDesc) OrderBookResult() *chainjson.GetOrderBookResult {
 	return &chainjson.GetOrderBookResult{
 		Bid:    oD.Bid,
 		Price:  oD.Price(),
-		Amount: oD.Amount.ToBTC(),
+		Amount: oD.Amount.ToCoin(),
 	}
 }
 
@@ -664,7 +664,7 @@ func getOrdersForDepth(orders *list.List, depth float64) []*OdrDesc {
 
 		// limit the list by market depth param
 		if depth > 0 {
-			total += odrDesc.Amount.ToBTC()
+			total += odrDesc.Amount.ToCoin()
 			if total >= depth {
 				return result
 			}

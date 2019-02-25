@@ -10,10 +10,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
-	"github.com/endurio/ndrd/chainjson"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
-	"github.com/endurio/ndrd/wire"
+	"github.com/endurio/ndrd/chainjson"
 	"github.com/endurio/ndrd/chainutil"
+	"github.com/endurio/ndrd/wire"
 )
 
 // SigHashType enumerates the available signature hashing types that the
@@ -244,7 +244,7 @@ func (c *Client) CreateRawTransactionAsync(inputs []chainjson.TransactionInput,
 
 	convertedAmts := make(map[string]float64, len(amounts))
 	for addr, amount := range amounts {
-		convertedAmts[addr.String()] = amount.ToBTC()
+		convertedAmts[addr.String()] = amount.ToCoin()
 	}
 	cmd := chainjson.NewCreateRawTransactionCmd(inputs, convertedAmts, lockTime)
 	return c.sendCmd(cmd)

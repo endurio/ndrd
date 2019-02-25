@@ -879,7 +879,7 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClie
 		amount += txOut.Value
 	}
 
-	ntfn := chainjson.NewTxAcceptedNtfn(txHashStr, chainutil.Amount(amount).ToBTC())
+	ntfn := chainjson.NewTxAcceptedNtfn(txHashStr, chainutil.Amount(amount).ToCoin())
 	marshalledJSON, err := chainjson.MarshalCmd(nil, ntfn)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal tx notification: %s", err.Error())
@@ -928,7 +928,7 @@ func (m *wsNotificationManager) notifyForNewOdr(clients map[chan struct{}]*wsCli
 		amount += odrOut.Value
 	}
 
-	ntfn := chainjson.NewOdrAcceptedNtfn(odrHashStr, chainutil.Amount(amount).ToBTC())
+	ntfn := chainjson.NewOdrAcceptedNtfn(odrHashStr, chainutil.Amount(amount).ToCoin())
 	marshalledJSON, err := chainjson.MarshalCmd(nil, ntfn)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal odr notification: %s", err.Error())

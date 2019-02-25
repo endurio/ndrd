@@ -120,7 +120,7 @@ func TestBIP0113Activation(t *testing.T) {
 	defer r.TearDown()
 
 	// Create a fresh output for usage within the test below.
-	const outputValue = chainutil.SatoshiPerBitcoin
+	const outputValue = chainutil.AtomPerCoin
 	outputKey, testOutput, testPkScript, err := makeTestOutput(r, t,
 		outputValue)
 	if err != nil {
@@ -427,7 +427,7 @@ func TestBIP0068AndBIP0112Activation(t *testing.T) {
 	}
 
 	const (
-		outputAmt         = chainutil.SatoshiPerBitcoin
+		outputAmt         = chainutil.AtomPerCoin
 		relativeBlockLock = 10
 	)
 

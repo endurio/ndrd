@@ -52,7 +52,7 @@ func TestAmountCreation(t *testing.T) {
 			name:     "one hundred",
 			amount:   100,
 			valid:    true,
-			expected: 100 * SatoshiPerBitcoin,
+			expected: 100 * AtomPerCoin,
 		},
 		{
 			name:     "fraction",
@@ -64,13 +64,13 @@ func TestAmountCreation(t *testing.T) {
 			name:     "rounding up",
 			amount:   54.999999999999943157,
 			valid:    true,
-			expected: 55 * SatoshiPerBitcoin,
+			expected: 55 * AtomPerCoin,
 		},
 		{
 			name:     "rounding down",
 			amount:   55.000000000000056843,
 			valid:    true,
-			expected: 55 * SatoshiPerBitcoin,
+			expected: 55 * AtomPerCoin,
 		},
 
 		// Negative tests.
@@ -157,7 +157,7 @@ func TestAmountUnitConversions(t *testing.T) {
 
 			name:      "satoshi",
 			amount:    44433322211100,
-			unit:      AmountSatoshi,
+			unit:      AmountAtom,
 			converted: 44433322211100,
 			s:         "44433322211100 Atom",
 		},
@@ -186,7 +186,7 @@ func TestAmountUnitConversions(t *testing.T) {
 
 		// Verify that Amount.ToBTC works as advertised.
 		f1 := test.amount.ToUnit(AmountBTC)
-		f2 := test.amount.ToBTC()
+		f2 := test.amount.ToCoin()
 		if f1 != f2 {
 			t.Errorf("%v: ToBTC does not match ToUnit(AmountBTC): %v != %v", test.name, f1, f2)
 		}

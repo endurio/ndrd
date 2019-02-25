@@ -23,7 +23,7 @@ const (
 	blockTime     = epochTimeSpan / blockPerEpoch
 
 	// PreminedSTB defines the premined amount of STB.
-	PreminedSTB = 1000 * 1e6 // chainutil.SatoshiPerBitcoin
+	PreminedSTB = 1000 * 1e6 // chainutil.AtomPerCoin
 	// PreminedNDR defines the premined amount of NDR.
 	PreminedNDR = 130056556740610 // ~ 130 mil NDR
 )

@@ -444,7 +444,7 @@ func (r FutureSetTxFeeResult) Receive() error {
 //
 // See SetTxFee for the blocking version and more details.
 func (c *Client) SetTxFeeAsync(fee chainutil.Amount) FutureSetTxFeeResult {
-	cmd := chainjson.NewSetTxFeeCmd(fee.ToBTC())
+	cmd := chainjson.NewSetTxFeeCmd(fee.ToCoin())
 	return c.sendCmd(cmd)
 }
 
@@ -483,7 +483,7 @@ func (r FutureSendToAddressResult) Receive() (*chainhash.Hash, error) {
 // See SendToAddress for the blocking version and more details.
 func (c *Client) SendToAddressAsync(address chainutil.Address, amount chainutil.Amount) FutureSendToAddressResult {
 	addr := address.EncodeAddress()
-	cmd := chainjson.NewSendToAddressCmd(addr, amount.ToBTC(), nil, nil, nil)
+	cmd := chainjson.NewSendToAddressCmd(addr, amount.ToCoin(), nil, nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -502,7 +502,7 @@ func (c *Client) SendToAddress(address chainutil.Address, amount chainutil.Amoun
 // SendToAddressTokenAsync returns
 func (c *Client) SendToAddressTokenAsync(address chainutil.Address, amount chainutil.Amount, token string) FutureSendToAddressResult {
 	addr := address.EncodeAddress()
-	cmd := chainjson.NewSendToAddressCmd(addr, amount.ToBTC(), &token, nil, nil)
+	cmd := chainjson.NewSendToAddressCmd(addr, amount.ToCoin(), &token, nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -521,7 +521,7 @@ func (c *Client) SendToAddressCommentAsync(address chainutil.Address,
 	commentTo string) FutureSendToAddressResult {
 
 	addr := address.EncodeAddress()
-	cmd := chainjson.NewSendToAddressCmd(addr, amount.ToBTC(), &token, &comment,
+	cmd := chainjson.NewSendToAddressCmd(addr, amount.ToCoin(), &token, &comment,
 		&commentTo)
 	return c.sendCmd(cmd)
 }
@@ -574,7 +574,7 @@ func (r FutureSendFromResult) Receive() (*chainhash.Hash, error) {
 // See SendFrom for the blocking version and more details.
 func (c *Client) SendFromAsync(fromAccount string, toAddress chainutil.Address, amount chainutil.Amount, token string) FutureSendFromResult {
 	addr := toAddress.EncodeAddress()
-	cmd := chainjson.NewSendFromCmd(fromAccount, addr, amount.ToBTC(), &token, nil,
+	cmd := chainjson.NewSendFromCmd(fromAccount, addr, amount.ToCoin(), &token, nil,
 		nil, nil)
 	return c.sendCmd(cmd)
 }
@@ -598,7 +598,7 @@ func (c *Client) SendFrom(fromAccount string, toAddress chainutil.Address, amoun
 // See SendFromMinConf for the blocking version and more details.
 func (c *Client) SendFromMinConfAsync(fromAccount string, toAddress chainutil.Address, amount chainutil.Amount, token string, minConfirms int) FutureSendFromResult {
 	addr := toAddress.EncodeAddress()
-	cmd := chainjson.NewSendFromCmd(fromAccount, addr, amount.ToBTC(), &token,
+	cmd := chainjson.NewSendFromCmd(fromAccount, addr, amount.ToCoin(), &token,
 		&minConfirms, nil, nil)
 	return c.sendCmd(cmd)
 }
@@ -627,7 +627,7 @@ func (c *Client) SendFromCommentAsync(fromAccount string,
 	comment, commentTo string) FutureSendFromResult {
 
 	addr := toAddress.EncodeAddress()
-	cmd := chainjson.NewSendFromCmd(fromAccount, addr, amount.ToBTC(), &token,
+	cmd := chainjson.NewSendFromCmd(fromAccount, addr, amount.ToCoin(), &token,
 		&minConfirms, &comment, &commentTo)
 	return c.sendCmd(cmd)
 }
@@ -683,7 +683,7 @@ func (r FutureSendManyResult) Receive() (*chainhash.Hash, error) {
 func (c *Client) SendManyAsync(fromAccount string, amounts map[chainutil.Address]chainutil.Amount) FutureSendManyResult {
 	convertedAmounts := make(map[string]float64, len(amounts))
 	for addr, amount := range amounts {
-		convertedAmounts[addr.EncodeAddress()] = amount.ToBTC()
+		convertedAmounts[addr.EncodeAddress()] = amount.ToCoin()
 	}
 	cmd := chainjson.NewSendManyCmd(fromAccount, convertedAmounts, nil, nil, nil)
 	return c.sendCmd(cmd)
@@ -705,7 +705,7 @@ func (c *Client) SendMany(fromAccount string, amounts map[chainutil.Address]chai
 func (c *Client) SendManyTokenAsync(fromAccount string, amounts map[chainutil.Address]chainutil.Amount, token string) FutureSendManyResult {
 	convertedAmounts := make(map[string]float64, len(amounts))
 	for addr, amount := range amounts {
-		convertedAmounts[addr.EncodeAddress()] = amount.ToBTC()
+		convertedAmounts[addr.EncodeAddress()] = amount.ToCoin()
 	}
 	cmd := chainjson.NewSendManyCmd(fromAccount, convertedAmounts, &token, nil, nil)
 	return c.sendCmd(cmd)
@@ -727,7 +727,7 @@ func (c *Client) SendManyMinConfAsync(fromAccount string,
 
 	convertedAmounts := make(map[string]float64, len(amounts))
 	for addr, amount := range amounts {
-		convertedAmounts[addr.EncodeAddress()] = amount.ToBTC()
+		convertedAmounts[addr.EncodeAddress()] = amount.ToCoin()
 	}
 	cmd := chainjson.NewSendManyCmd(fromAccount, convertedAmounts,
 		&token, &minConfirms, nil)
@@ -761,7 +761,7 @@ func (c *Client) SendManyCommentAsync(fromAccount string,
 
 	convertedAmounts := make(map[string]float64, len(amounts))
 	for addr, amount := range amounts {
-		convertedAmounts[addr.EncodeAddress()] = amount.ToBTC()
+		convertedAmounts[addr.EncodeAddress()] = amount.ToCoin()
 	}
 	cmd := chainjson.NewSendManyCmd(fromAccount, convertedAmounts,
 		&token, &minConfirms, &comment)
@@ -1200,7 +1200,7 @@ func (r FutureMoveResult) Receive() (bool, error) {
 //
 // See Move for the blocking version and more details.
 func (c *Client) MoveAsync(fromAccount, toAccount string, amount chainutil.Amount) FutureMoveResult {
-	cmd := chainjson.NewMoveCmd(fromAccount, toAccount, amount.ToBTC(), nil,
+	cmd := chainjson.NewMoveCmd(fromAccount, toAccount, amount.ToCoin(), nil,
 		nil)
 	return c.sendCmd(cmd)
 }
@@ -1221,7 +1221,7 @@ func (c *Client) Move(fromAccount, toAccount string, amount chainutil.Amount) (b
 func (c *Client) MoveMinConfAsync(fromAccount, toAccount string,
 	amount chainutil.Amount, minConfirms int) FutureMoveResult {
 
-	cmd := chainjson.NewMoveCmd(fromAccount, toAccount, amount.ToBTC(),
+	cmd := chainjson.NewMoveCmd(fromAccount, toAccount, amount.ToCoin(),
 		&minConfirms, nil)
 	return c.sendCmd(cmd)
 }
@@ -1244,7 +1244,7 @@ func (c *Client) MoveMinConf(fromAccount, toAccount string, amount chainutil.Amo
 func (c *Client) MoveCommentAsync(fromAccount, toAccount string,
 	amount chainutil.Amount, minConfirms int, comment string) FutureMoveResult {
 
-	cmd := chainjson.NewMoveCmd(fromAccount, toAccount, amount.ToBTC(),
+	cmd := chainjson.NewMoveCmd(fromAccount, toAccount, amount.ToCoin(),
 		&minConfirms, &comment)
 	return c.sendCmd(cmd)
 }

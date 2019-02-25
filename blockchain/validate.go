@@ -43,7 +43,7 @@ const (
 
 	// baseSubsidy is the starting subsidy amount for mined blocks.  This
 	// value is halved every SubsidyHalvingInterval blocks.
-	baseSubsidy = 50 * chainutil.SatoshiPerBitcoin
+	baseSubsidy = 50 * chainutil.AtomPerCoin
 )
 
 var (
@@ -231,7 +231,7 @@ func CheckTransactionSanity(tx *chainutil.Tx) error {
 	// transaction.  Also, the total of all outputs must abide by the same
 	// restrictions.  All amounts in a transaction are in a unit value known
 	// as a satoshi.  One bitcoin is a quantity of satoshi as defined by the
-	// SatoshiPerBitcoin constant.
+	// AtomPerCoin constant.
 	for _, token := range []wire.TokenIdentity{wire.STB, wire.NDR} {
 		var totalSatoshi int64
 		for _, txOut := range msgTx.TxOut {
@@ -938,7 +938,7 @@ func CheckTransactionInputs(tx *chainutil.Tx, txHeight int32, utxoView *UtxoView
 		// or more than the max allowed per transaction.  All amounts in
 		// a transaction are in a unit value known as a satoshi.  One
 		// bitcoin is a quantity of satoshi as defined by the
-		// SatoshiPerBitcoin constant.
+		// AtomPerCoin constant.
 		originTxSatoshi := utxo.Amount()
 		if originTxSatoshi < 0 {
 			str := fmt.Sprintf("transaction output has negative "+

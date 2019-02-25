@@ -1207,7 +1207,7 @@ func (mp *TxPool) RawMempoolVerbose() map[string]*chainjson.GetRawMempoolVerbose
 		mpd := &chainjson.GetRawMempoolVerboseResult{
 			Size:             int32(tx.MsgTx().SerializeSize()),
 			Vsize:            int32(GetTxVirtualSize(tx)),
-			Fee:              chainutil.Amount(desc.Fee).ToBTC(),
+			Fee:              chainutil.Amount(desc.Fee).ToCoin(),
 			Time:             desc.Added.Unix(),
 			Height:           int64(desc.Height),
 			StartingPriority: desc.StartingPriority,

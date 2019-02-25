@@ -20,33 +20,33 @@ type AmountUnit int
 // These constants define various units used when describing a bitcoin
 // monetary amount.
 const (
-	AmountMegaBTC  AmountUnit = 6
-	AmountKiloBTC  AmountUnit = 3
-	AmountBTC      AmountUnit = 0
-	AmountMilliBTC AmountUnit = -3
-	AmountMicroBTC AmountUnit = -6
-	AmountSatoshi  AmountUnit = -8
+	AmountMegaCoin  AmountUnit = 6
+	AmountKiloCoin  AmountUnit = 3
+	AmountCoin      AmountUnit = 0
+	AmountMilliCoin AmountUnit = -3
+	AmountMicroCoin AmountUnit = -6
+	AmountAtom      AmountUnit = -8
 )
 
 // String returns the unit as a string.  For recognized units, the SI
 // prefix is used, or "Atom" for the base unit.  For all unrecognized
-// units, "1eN BTC" is returned, where N is the AmountUnit.
+// units, "1eN Coin" is returned, where N is the AmountUnit.
 func (u AmountUnit) String() string {
 	switch u {
-	case AmountMegaBTC:
-		return "MBTC"
-	case AmountKiloBTC:
-		return "kBTC"
-	case AmountBTC:
-		return "BTC"
-	case AmountMilliBTC:
-		return "mBTC"
-	case AmountMicroBTC:
-		return "μBTC"
-	case AmountSatoshi:
+	case AmountMegaCoin:
+		return "MCoin"
+	case AmountKiloCoin:
+		return "kCoin"
+	case AmountCoin:
+		return "Coin"
+	case AmountMilliCoin:
+		return "mCoin"
+	case AmountMicroCoin:
+		return "μCoin"
+	case AmountAtom:
 		return "Atom"
 	default:
-		return "1e" + strconv.FormatInt(int64(u), 10) + " BTC"
+		return "1e" + strconv.FormatInt(int64(u), 10) + " Coin"
 	}
 }
 
@@ -70,7 +70,7 @@ func round(f float64) Amount {
 // does not check that the amount is within the total amount of bitcoin
 // producible as f may not refer to an amount at a single moment in time.
 //
-// NewAmount is for specifically for converting BTC to Atom.
+// NewAmount is for specifically for converting Coin to Atom.
 // For creating a new Amount with an int64 value which denotes a quantity of Atom,
 // do a simple type conversion from type int64 to Amount.
 // See GoDoc for example: http://godoc.org/github.com/endurio/ndrd/chainutil#example-Amount
@@ -83,10 +83,10 @@ func NewAmount(f float64) (Amount, error) {
 	case math.IsInf(f, 1):
 		fallthrough
 	case math.IsInf(f, -1):
-		return 0, errors.New("invalid bitcoin amount")
+		return 0, errors.New("invalid coin amount")
 	}
 
-	return round(f * SatoshiPerBitcoin), nil
+	return round(f * AtomPerCoin), nil
 }
 
 // ToUnit converts a monetary amount counted in bitcoin base units to a
@@ -95,9 +95,9 @@ func (a Amount) ToUnit(u AmountUnit) float64 {
 	return float64(a) / math.Pow10(int(u+8))
 }
 
-// ToBTC is the equivalent of calling ToUnit with AmountBTC.
-func (a Amount) ToBTC() float64 {
-	return a.ToUnit(AmountBTC)
+// ToCoin is the equivalent of calling ToUnit with AmountCoin.
+func (a Amount) ToCoin() float64 {
+	return a.ToUnit(AmountCoin)
 }
 
 // Format formats a monetary amount counted in bitcoin base units as a
@@ -109,9 +109,9 @@ func (a Amount) Format(u AmountUnit) string {
 	return strconv.FormatFloat(a.ToUnit(u), 'f', -int(u+8), 64) + units
 }
 
-// String is the equivalent of calling Format with AmountBTC.
+// String is the equivalent of calling Format with AmountCoin.
 func (a Amount) String() string {
-	return a.Format(AmountBTC)
+	return a.Format(AmountCoin)
 }
 
 // MulF64 multiplies an Amount by a floating point value.  While this is not

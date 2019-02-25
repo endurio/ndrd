@@ -64,7 +64,7 @@ func ExampleAmount_unitConversions() {
 	fmt.Println("Atom to BTC:", amount)
 	fmt.Println("Atom to MilliBTC:", amount.Format(chainutil.AmountMilliBTC))
 	fmt.Println("Atom to MicroBTC:", amount.Format(chainutil.AmountMicroBTC))
-	fmt.Println("Atom to Atom:", amount.Format(chainutil.AmountSatoshi))
+	fmt.Println("Atom to Atom:", amount.Format(chainutil.AmountAtom))
 
 	// Output:
 	// Atom to kBTC: 444.333222111 kBTC
