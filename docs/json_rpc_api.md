@@ -138,7 +138,7 @@ authenticated will cause the websocket to be closed immediately.
 
 ### 4. Command-line Utility
 
-ndrd comes with a separate utility named `btcctl` which can be used to issue
+ndrd comes with a separate utility named `chainctl` which can be used to issue
 these RPC commands via HTTP POST requests to ndrd after configuring it with the
 information in the [Authentication](#Authentication) section above.  It can also
 be used to communicate with any server/daemon/service which provides a JSON-RPC

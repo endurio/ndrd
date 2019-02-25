@@ -42,7 +42,7 @@ function killall() {
 	taskkill -F -IM "$1.exe"
 }
 
-CTL="btcctl --rpcuser=a --rpcpass=a --skipverify"
+CTL="chainctl --rpcuser=a --rpcpass=a --skipverify"
 CTLW="$CTL --wallet"
 
 BTCD="btcd --singlenode --rpcuser=a --rpcpass=a --generate"

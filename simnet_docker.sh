@@ -107,9 +107,9 @@ if [[ $daemon_only -eq 0 ]]; then
 	for ((i=0; i<NODES_COUNT; i++))
 	do
 		WALLET_RPCPORT=$((20000+i))
-		btcctl --simnet --rpcuser=a --rpcpass=a --skipverify -s localhost:$WALLET_RPCPORT --wallet\
+		chainctl --simnet --rpcuser=a --rpcpass=a --skipverify -s localhost:$WALLET_RPCPORT --wallet\
 				walletpassphrase "password" 0 &&\
-		btcctl --simnet --rpcuser=a --rpcpass=a --skipverify -s localhost:$WALLET_RPCPORT --wallet\
+		chainctl --simnet --rpcuser=a --rpcpass=a --skipverify -s localhost:$WALLET_RPCPORT --wallet\
 				importprivkey ${MINING_SKEYS[$i]} &&\
 		echo "PrvKey imported: ${MINING_SKEYS[$i]}"
 	done

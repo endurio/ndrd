@@ -27,9 +27,9 @@ const (
 
 var (
 	btcdHomeDir           = chainutil.AppDataDir("ndrd", false)
-	btcctlHomeDir         = chainutil.AppDataDir("btcctl", false)
+	btcctlHomeDir         = chainutil.AppDataDir("chainctl", false)
 	btcwalletHomeDir      = chainutil.AppDataDir("btcwallet", false)
-	defaultConfigFile     = filepath.Join(btcctlHomeDir, "btcctl.conf")
+	defaultConfigFile     = filepath.Join(btcctlHomeDir, "chainctl.conf")
 	defaultRPCServer      = "localhost"
 	defaultRPCCertFile    = filepath.Join(btcdHomeDir, "rpc.cert")
 	defaultWalletCertFile = filepath.Join(btcwalletHomeDir, "rpc.cert")
@@ -88,7 +88,7 @@ func listCommands() {
 	}
 }
 
-// config defines the configuration options for btcctl.
+// config defines the configuration options for chainctl.
 //
 // See loadConfig for details on the configuration load process.
 type config struct {
@@ -211,7 +211,7 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	if _, err := os.Stat(preCfg.ConfigFile); os.IsNotExist(err) {
-		// Use config file for RPC server to create default btcctl config
+		// Use config file for RPC server to create default chainctl config
 		var serverConfigPath string
 		if preCfg.Wallet {
 			serverConfigPath = filepath.Join(btcwalletHomeDir, "btcwallet.conf")
