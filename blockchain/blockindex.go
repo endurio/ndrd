@@ -1,4 +1,4 @@
-// Copyright (c) 2015-2017 The endurio developers
+// Copyright (c) 2015-2017 The btcsuite developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
+	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/database"
 	"github.com/endurio/ndrd/wire"
 )
