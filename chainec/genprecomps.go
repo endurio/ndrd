@@ -1,4 +1,5 @@
 // Copyright 2015 The btcsuite developers
+// Copyright (c) 2018-2019 The Endurio developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -41,7 +42,8 @@ func main() {
 	encoded := make([]byte, base64.StdEncoding.EncodedLen(compressed.Len()))
 	base64.StdEncoding.Encode(encoded, compressed.Bytes())
 
-	fmt.Fprintln(fi, "// Copyright (c) 2015 The btcsuite developers")
+	fmt.Fprintln(fi, "// Copyright (c) 2015 The btcsuite developers
+// Copyright (c) 2018-2019 The Endurio developers")
 	fmt.Fprintln(fi, "// Use of this source code is governed by an ISC")
 	fmt.Fprintln(fi, "// license that can be found in the LICENSE file.")
 	fmt.Fprintln(fi)
