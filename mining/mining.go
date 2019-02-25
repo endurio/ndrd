@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/endurio/ndrd/blockchain"
-	"github.com/endurio/ndrd/btcec"
+	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/txscript"
@@ -269,7 +269,7 @@ type BlockTemplate struct {
 }
 
 // Address returns the mining address for mining private key and chain params
-func Address(key *btcec.PrivateKey, chainParams *chaincfg.Params) util.Address {
+func Address(key *chainec.PrivateKey, chainParams *chaincfg.Params) util.Address {
 	serializedPK := key.PubKey().SerializeCompressed()
 	address, err := util.NewAddressPubKey(serializedPK, chainParams)
 	if err != nil {

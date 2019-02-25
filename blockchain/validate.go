@@ -12,7 +12,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/endurio/ndrd/btcec"
+	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/txscript"
@@ -440,7 +440,7 @@ func checkBlockHeaderSanity(header *wire.BlockHeader, chainParams *chaincfg.Para
 	// no PoW nor signature check for block template
 	if flags&BFNoPoWCheck != BFNoPoWCheck {
 		// Recover the public key
-		pubkey, _, err := btcec.RecoverCompact(btcec.S256(), header.Signature[:], header.BlockHashWithoutSignature())
+		pubkey, _, err := chainec.RecoverCompact(chainec.S256(), header.Signature[:], header.BlockHashWithoutSignature())
 		if err != nil {
 			str := fmt.Sprintf("unable to recover a valid key from block signature %v: %v", header.Signature, err)
 			return ruleError(ErrBadSignature, str)

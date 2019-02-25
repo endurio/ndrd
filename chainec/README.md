@@ -1,14 +1,14 @@
-btcec
+chainec
 =====
 
-[![Build Status](https://travis-ci.org/endurio/ndrd.png?branch=master)](https://travis-ci.org/endurio/btcec)
+[![Build Status](https://travis-ci.org/endurio/ndrd.png?branch=master)](https://travis-ci.org/endurio/chainec)
 [![ISC License](http://img.shields.io/badge/license-ISC-blue.svg)](http://copyfree.org)
-[![GoDoc](https://godoc.org/github.com/endurio/ndrd/btcec?status.png)](http://godoc.org/github.com/endurio/ndrd/btcec)
+[![GoDoc](https://godoc.org/github.com/endurio/ndrd/chainec?status.png)](http://godoc.org/github.com/endurio/ndrd/chainec)
 
-Package btcec implements elliptic curve cryptography needed for working with
+Package chainec implements elliptic curve cryptography needed for working with
 Bitcoin (secp256k1 only for now). It is designed so that it may be used with the
 standard crypto/ecdsa packages provided with go.  A comprehensive suite of test
-is provided to ensure proper functionality.  Package btcec was originally based
+is provided to ensure proper functionality.  Package chainec was originally based
 on work from ThePiachu which is licensed under the same terms as Go, but it has
 signficantly diverged since then.  The endurio developers original is licensed
 under the liberal ISC license.
@@ -20,24 +20,24 @@ use secp256k1 elliptic curve cryptography.
 ## Installation and Updating
 
 ```bash
-$ go get -u github.com/endurio/ndrd/btcec
+$ go get -u github.com/endurio/ndrd/chainec
 ```
 
 ## Examples
 
-* [Sign Message](http://godoc.org/github.com/endurio/ndrd/btcec#example-package--SignMessage)  
+* [Sign Message](http://godoc.org/github.com/endurio/ndrd/chainec#example-package--SignMessage)  
   Demonstrates signing a message with a secp256k1 private key that is first
   parsed form raw bytes and serializing the generated signature.
 
-* [Verify Signature](http://godoc.org/github.com/endurio/ndrd/btcec#example-package--VerifySignature)  
+* [Verify Signature](http://godoc.org/github.com/endurio/ndrd/chainec#example-package--VerifySignature)  
   Demonstrates verifying a secp256k1 signature against a public key that is
   first parsed from raw bytes.  The signature is also parsed from raw bytes.
 
-* [Encryption](http://godoc.org/github.com/endurio/ndrd/btcec#example-package--EncryptMessage)
+* [Encryption](http://godoc.org/github.com/endurio/ndrd/chainec#example-package--EncryptMessage)
   Demonstrates encrypting a message for a public key that is first parsed from
   raw bytes, then decrypting it using the corresponding private key.
 
-* [Decryption](http://godoc.org/github.com/endurio/ndrd/btcec#example-package--DecryptMessage)
+* [Decryption](http://godoc.org/github.com/endurio/ndrd/chainec#example-package--DecryptMessage)
   Demonstrates decrypting a message using a private key that is first parsed
   from raw bytes.
 
@@ -63,6 +63,6 @@ verify the signature perform the following:
 
 ## License
 
-Package btcec is licensed under the [copyfree](http://copyfree.org) ISC License
-except for btcec.go and btcec_test.go which is under the same license as Go.
+Package chainec is licensed under the [copyfree](http://copyfree.org) ISC License
+except for chainec.go and chainec_test.go which is under the same license as Go.
 

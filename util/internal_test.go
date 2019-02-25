@@ -12,7 +12,7 @@ interface. The functions are only exported while the tests are being run.
 package util
 
 import (
-	"github.com/endurio/ndrd/btcec"
+	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/util/base58"
 	"github.com/endurio/ndrd/util/bech32"
 	"golang.org/x/crypto/ripemd160"
@@ -82,10 +82,10 @@ func TstAddressWitnessScriptHash(version byte, program [32]byte,
 func TstAddressPubKey(serializedPubKey []byte, pubKeyFormat PubKeyFormat,
 	netID byte) *AddressPubKey {
 
-	pubKey, _ := btcec.ParsePubKey(serializedPubKey, btcec.S256())
+	pubKey, _ := chainec.ParsePubKey(serializedPubKey, chainec.S256())
 	return &AddressPubKey{
 		pubKeyFormat: pubKeyFormat,
-		pubKey:       (*btcec.PublicKey)(pubKey),
+		pubKey:       (*chainec.PublicKey)(pubKey),
 		pubKeyHashID: netID,
 	}
 }

@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/endurio/ndrd/blockchain"
-	"github.com/endurio/ndrd/btcec"
+	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/mining"
@@ -56,7 +56,7 @@ type Config struct {
 	BlockTemplateGenerator *mining.BlkTmplGenerator
 
 	// MiningKey is the private key to use for the generated blocks.
-	MiningKey *btcec.PrivateKey
+	MiningKey *chainec.PrivateKey
 
 	// ProcessBlock defines the function to call with any solved blocks.
 	// It typically must run the provided block through the same set of

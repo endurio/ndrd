@@ -9,7 +9,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/endurio/ndrd/btcec"
+	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 )
 
@@ -18,7 +18,7 @@ import (
 // PriceDerivation 8 bytes +
 // Miner's Signature +
 // PrevBlock and MerkleRoot hashes.
-var MaxBlockHeaderPayload = 16 + 8 + (chainhash.HashSize * 2) + btcec.CompactSignatureSize
+var MaxBlockHeaderPayload = 16 + 8 + (chainhash.HashSize * 2) + chainec.CompactSignatureSize
 
 // BlockHeader defines information about a block and is used in the bitcoin
 // block (MsgBlock) and headers (MsgHeaders) messages.
@@ -50,7 +50,7 @@ type BlockHeader struct {
 	// Miner's signature for all data above in compact format.
 	// PK recovered from this must be the same with coinbase address,
 	// otherwise, the coinbase tx cannot be spent.
-	Signature btcec.CompactSignature
+	Signature chainec.CompactSignature
 }
 
 // blockHeaderLen is a constant that represents the number of bytes for a block
@@ -75,17 +75,17 @@ func (h *BlockHeader) BlockHashWithoutSignature() []byte {
 	// transactions.  Ignore the error returns since there is no way the
 	// encode could fail except being out of memory which would cause a
 	// run-time panic.
-	buf := bytes.NewBuffer(make([]byte, 0, MaxBlockHeaderPayload-btcec.CompactSignatureSize))
+	buf := bytes.NewBuffer(make([]byte, 0, MaxBlockHeaderPayload-chainec.CompactSignatureSize))
 	_ = writeBlockHeaderWithoutSignature(buf, 0, h)
 
 	return chainhash.DoubleHashB(buf.Bytes())
 }
 
 // Sign signs the header data (except the signature itself)
-func (h *BlockHeader) Sign(key *btcec.PrivateKey) (*btcec.CompactSignature, error) {
+func (h *BlockHeader) Sign(key *chainec.PrivateKey) (*chainec.CompactSignature, error) {
 	hash := h.BlockHashWithoutSignature()
 
-	sigbytes, err := btcec.SignCompact(btcec.S256(), key, hash, true)
+	sigbytes, err := chainec.SignCompact(chainec.S256(), key, hash, true)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func (h *BlockHeader) Serialize(w io.Writer) error {
 // block hash, merkle root hash, difficulty bits, and nonce used to generate the
 // block with defaults for the remaining fields.
 func NewBlockHeader(version int32, prevHash, merkleRootHash *chainhash.Hash,
-	bits uint32, nonce uint32, priceDerivation float64, signature *btcec.CompactSignature) *BlockHeader {
+	bits uint32, nonce uint32, priceDerivation float64, signature *chainec.CompactSignature) *BlockHeader {
 
 	// Limit the timestamp to one second precision since the protocol
 	// doesn't support better.

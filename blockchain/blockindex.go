@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/endurio/ndrd/btcec"
+	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/database"
@@ -104,7 +104,7 @@ type blockNode struct {
 
 	priceDerivation Price
 	supplyChange    *big.Int // STB supply change in this block.
-	signature       btcec.CompactSignature
+	signature       chainec.CompactSignature
 
 	// status is a bitfield representing the validation state of the block. The
 	// status field, unlike the other fields, may be written to and so should

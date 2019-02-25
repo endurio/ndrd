@@ -282,7 +282,7 @@ information.
       Provides a set of block tests for testing the consensus validation rules
     * [txscript](https://github.com/endurio/ndrd/tree/master/txscript) -
       Implements the Bitcoin transaction scripting language
-    * [btcec](https://github.com/endurio/ndrd/tree/master/btcec) - Implements
+    * [chainec](https://github.com/endurio/ndrd/tree/master/chainec) - Implements
       support for the elliptic curve cryptographic functions needed for the
       Bitcoin scripts
     * [database](https://github.com/endurio/ndrd/tree/master/database) -

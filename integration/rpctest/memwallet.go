@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	"github.com/endurio/ndrd/blockchain"
-	"github.com/endurio/ndrd/btcec"
+	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/rpcclient"
@@ -71,7 +71,7 @@ type undoEntry struct {
 // wallet functionality to the harness. The wallet uses a hard-coded HD key
 // hierarchy which promotes reproducibility between harness test runs.
 type memWallet struct {
-	coinbaseKey  *btcec.PrivateKey
+	coinbaseKey  *chainec.PrivateKey
 	coinbaseAddr util.Address
 
 	// hdRoot is the root master private key for the wallet.
@@ -581,7 +581,7 @@ func (m *memWallet) ConfirmedBalance() util.Amount {
 }
 
 // keyToAddr maps the passed private to corresponding p2pkh address.
-func keyToAddr(key *btcec.PrivateKey, net *chaincfg.Params) (util.Address, error) {
+func keyToAddr(key *chainec.PrivateKey, net *chaincfg.Params) (util.Address, error) {
 	serializedKey := key.PubKey().SerializeCompressed()
 	pubKeyAddr, err := util.NewAddressPubKey(serializedKey, net)
 	if err != nil {
