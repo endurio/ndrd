@@ -101,10 +101,9 @@ Application Options:
       --maxorphantx=        Max number of orphan transactions to keep in memory
                             (100)
       --generate            Generate (mine) bitcoins using the CPU
-      --miningaddr=         Add the specified payment address to the list of
-                            addresses to use for generated blocks -- At least
-                            one address is required if the generate option is
-                            set
+      --miningkey=          Add the specified payment private key to use for
+                            generated blocks -- It is required if the generate
+                            option is set
       --blockminsize=       Mininum block size in bytes to be used when creating
                             a block
       --blockmaxsize=       Maximum block size in bytes to be used when creating

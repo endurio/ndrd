@@ -8,14 +8,17 @@ import (
 	"bytes"
 	"container/heap"
 	"fmt"
+	"math"
+	"math/big"
 	"time"
 
 	"github.com/endurio/ndrd/blockchain"
+	"github.com/endurio/ndrd/btcec"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/txscript"
-	"github.com/endurio/ndrd/wire"
 	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/wire"
 )
 
 const (
@@ -23,14 +26,16 @@ const (
 	// transaction to be considered high priority.
 	MinHighPriority = util.SatoshiPerBitcoin * 144.0 / 250
 
-	// blockHeaderOverhead is the max number of bytes it takes to serialize
-	// a block header and max possible transaction count.
-	blockHeaderOverhead = wire.MaxBlockHeaderPayload + wire.MaxVarIntPayload
-
 	// CoinbaseFlags is added to the coinbase script of a generated block
 	// and is used to monitor BIP16 support as well as blocks that are
 	// generated via ndrd.
 	CoinbaseFlags = "/P2SH/ndrd/"
+)
+
+var (
+	// blockHeaderOverhead is the max number of bytes it takes to serialize
+	// a block header and max possible transaction count.
+	blockHeaderOverhead = wire.MaxBlockHeaderPayload + wire.MaxVarIntPayload
 )
 
 // TxDesc is a descriptor about a transaction in a transaction source along with
@@ -70,6 +75,50 @@ type TxSource interface {
 	// HaveTransaction returns whether or not the passed transaction hash
 	// exists in the source pool.
 	HaveTransaction(hash *chainhash.Hash) bool
+}
+
+// OdrDesc is a descriptor about a order in a order source along with
+// additional metadata.
+type OdrDesc struct {
+	// Odr is the order associated with the entry.
+	*util.Odr
+
+	// Added is the time when the entry was added to the source pool.
+	Added time.Time
+
+	// Height is the block height when the entry was added to the the source
+	// pool.
+	Height int32
+
+	// Bid is the direction of the order for buying NDR.
+	Bid bool
+
+	// Amount is the total NDR will be bought or sold by the order.
+	Amount util.Amount
+
+	// Payout is the total STB will be spent by the order associated with the entry.
+	Payout util.Amount
+}
+
+// OdrSource represents a source of orders to consider for inclusion in
+// new blocks.
+//
+// The interface contract requires that all of these methods are safe for
+// concurrent access with respect to the source.
+type OdrSource interface {
+	// LastUpdated returns the last time a order was added to or
+	// removed from the source pool.
+	LastUpdated() time.Time
+
+	// MiningDescs returns a slice of mining descriptors for all the
+	// orders in the source pool to fill the provided amount.
+	// Positive amount returns bidding orders. Negative amount returns
+	// asking order.
+	MiningDescs(amount *big.Int) []*OdrDesc
+
+	// HaveOrder returns whether or not the passed order hash
+	// exists in the source pool.
+	HaveOrder(hash *chainhash.Hash) bool
 }
 
 // txPrioItem houses a transaction along with extra information that allows the
@@ -219,6 +268,17 @@ type BlockTemplate struct {
 	WitnessCommitment []byte
 }
 
+// Address returns the mining address for mining private key and chain params
+func Address(key *btcec.PrivateKey, chainParams *chaincfg.Params) util.Address {
+	serializedPK := key.PubKey().SerializeCompressed()
+	address, err := util.NewAddressPubKey(serializedPK, chainParams)
+	if err != nil {
+		// should not happen
+		return nil
+	}
+	return address.AddressPubKeyHash()
+}
+
 // mergeUtxoView adds all of the entries in viewB to viewA.  The result is that
 // viewA will contain all of its original entries plus all of the entries
 // in viewB.  It will replace any entries in viewB which also exist in viewA
@@ -279,10 +339,9 @@ func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockH
 		SignatureScript: coinbaseScript,
 		Sequence:        wire.MaxTxInSequenceNum,
 	})
-	tx.AddTxOut(&wire.TxOut{
-		Value:    blockchain.CalcBlockSubsidy(nextBlockHeight, params),
-		PkScript: pkScript,
-	})
+	// Block reward is paid using NDR
+	tx.AddTxOut(wire.NewTxOutToken(blockchain.CalcBlockSubsidy(nextBlockHeight, params),
+		pkScript, wire.NDR))
 	return util.NewTx(tx), nil
 }
 
@@ -348,9 +407,11 @@ func medianAdjustedTime(chainState *blockchain.BestState, timeSource blockchain.
 type BlkTmplGenerator struct {
 	policy      *Policy
 	chainParams *chaincfg.Params
+	odrSource   OdrSource
 	txSource    TxSource
 	chain       *blockchain.BlockChain
 	timeSource  blockchain.MedianTimeSource
+	priceSource blockchain.FeedPriceSource
 	sigCache    *txscript.SigCache
 	hashCache   *txscript.HashCache
 }
@@ -362,17 +423,21 @@ type BlkTmplGenerator struct {
 // templates are built on top of the current best chain and adhere to the
 // consensus rules.
 func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
+	odrSource OdrSource,
 	txSource TxSource, chain *blockchain.BlockChain,
 	timeSource blockchain.MedianTimeSource,
+	priceSource blockchain.FeedPriceSource,
 	sigCache *txscript.SigCache,
 	hashCache *txscript.HashCache) *BlkTmplGenerator {
 
 	return &BlkTmplGenerator{
 		policy:      policy,
 		chainParams: params,
+		odrSource:   odrSource,
 		txSource:    txSource,
 		chain:       chain,
 		timeSource:  timeSource,
+		priceSource: priceSource,
 		sigCache:    sigCache,
 		hashCache:   hashCache,
 	}
@@ -465,6 +530,18 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress util.Address) (*BlockTe
 	}
 	coinbaseSigOpCost := int64(blockchain.CountSigOps(coinbaseTx)) * blockchain.WitnessScaleFactor
 
+	var queueLen int
+	var sourceOdrs []*OdrDesc
+
+	// Get the current orders to fill the next absorption.
+	absorption := g.chain.CalcNextAbsorption()
+	if absorption != nil {
+		// absorb the orders
+		log.Infof("Absorption for %v µSTB is required.", absorption)
+		sourceOdrs = g.odrSource.MiningDescs(absorption)
+		queueLen += len(sourceOdrs)
+	}
+
 	// Get the current source transactions and create a priority queue to
 	// hold the transactions which are ready for inclusion into a block
 	// along with some priority related and fee metadata.  Reserve the same
@@ -473,13 +550,14 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress util.Address) (*BlockTe
 	// or not there is an area allocated for high-priority transactions.
 	sourceTxns := g.txSource.MiningDescs()
 	sortedByFee := g.policy.BlockPrioritySize == 0
-	priorityQueue := newTxPriorityQueue(len(sourceTxns), sortedByFee)
+	queueLen += len(sourceTxns)
+	priorityQueue := newTxPriorityQueue(queueLen, sortedByFee)
 
 	// Create a slice to hold the transactions to be included in the
 	// generated block with reserved space.  Also create a utxo view to
 	// house all of the input transactions so multiple lookups can be
 	// avoided.
-	blockTxns := make([]*util.Tx, 0, len(sourceTxns))
+	blockTxns := make([]*util.Tx, 0, queueLen)
 	blockTxns = append(blockTxns, coinbaseTx)
 	blockUtxos := blockchain.NewUtxoViewpoint()
 
@@ -500,6 +578,17 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress util.Address) (*BlockTe
 	txSigOpCosts := make([]int64, 0, len(sourceTxns))
 	txFees = append(txFees, -1) // Updated once known
 	txSigOpCosts = append(txSigOpCosts, coinbaseSigOpCost)
+
+	if sourceOdrs != nil {
+		if len(sourceOdrs) > 0 {
+			log.Debugf("Including %d orders to new block", len(sourceOdrs))
+			g.orderbookLoop(sourceOdrs, nextBlockHeight, dependers, priorityQueue, blockUtxos)
+			log.Tracef("Priority queue len %d, dependers len %d",
+				priorityQueue.Len(), len(dependers))
+		} else {
+			log.Debug("No appropriate orders for inclusion to new block")
+		}
+	}
 
 	log.Debugf("Considering %d transactions for inclusion to new block",
 		len(sourceTxns))
@@ -597,10 +686,11 @@ mempoolLoop:
 	// The starting block size is the size of the block header plus the max
 	// possible transaction count size, plus the size of the coinbase
 	// transaction.
-	blockWeight := uint32((blockHeaderOverhead * blockchain.WitnessScaleFactor) +
+	blockWeight := uint32((int64(blockHeaderOverhead) * blockchain.WitnessScaleFactor) +
 		blockchain.GetTransactionWeight(coinbaseTx))
 	blockSigOpCost := coinbaseSigOpCost
 	totalFees := int64(0)
+	accAbsorption := new(big.Int)
 
 	// Query the version bits state to see if segwit has been activated, if
 	// so then this means that we'll include any transactions with witness
@@ -739,7 +829,7 @@ mempoolLoop:
 
 		// Ensure the transaction inputs pass all of the necessary
 		// preconditions before allowing it to be added to the block.
-		_, err = blockchain.CheckTransactionInputs(tx, nextBlockHeight,
+		balances, err := blockchain.CheckTransactionInputs(tx, nextBlockHeight,
 			blockUtxos, g.chainParams)
 		if err != nil {
 			log.Tracef("Skipping tx %s due to error in "+
@@ -747,6 +837,37 @@ mempoolLoop:
 			logSkippedDeps(tx, deps)
 			continue
 		}
+
+		balanceSTB := balances[wire.STB]
+		if balanceSTB > 0 || balances[wire.NDR] > 0 {
+			absnSign := absorption.Sign()
+			if absorption == nil || absnSign == 0 {
+				return nil, blockchain.RuleError{
+					ErrorCode:   blockchain.ErrBadAbsorption,
+					Description: "Order cannot be mined when there is no absorption.",
+				}
+			}
+			if (absnSign > 0) != (balanceSTB > 0) {
+				return nil, blockchain.RuleError{
+					ErrorCode:   blockchain.ErrBadAbsorption,
+					Description: "Wrong order direction to mine.",
+				}
+			}
+			if (balanceSTB > 0) == (balances[wire.NDR] > 0) {
+				return nil, blockchain.RuleError{
+					ErrorCode:   blockchain.ErrBadAbsorption,
+					Description: "Invalid order: one token must be exchanged for the other.",
+				}
+			}
+			accAbsorption.Add(accAbsorption, big.NewInt(balanceSTB))
+			if accAbsorption.Cmp(absorption) == absnSign {
+				return nil, blockchain.RuleError{
+					ErrorCode:   blockchain.ErrBadAbsorption,
+					Description: "Over absorbed.",
+				}
+			}
+		}
+
 		err = blockchain.ValidateTransactionScripts(tx, blockUtxos,
 			txscript.StandardVerifyFlags, g.sigCache,
 			g.hashCache)
@@ -859,11 +980,12 @@ mempoolLoop:
 	merkles := blockchain.BuildMerkleTreeStore(blockTxns, false)
 	var msgBlock wire.MsgBlock
 	msgBlock.Header = wire.BlockHeader{
-		Version:    nextBlockVersion,
-		PrevBlock:  best.Hash,
-		MerkleRoot: *merkles[len(merkles)-1],
-		Timestamp:  ts,
-		Bits:       reqDifficulty,
+		Version:         nextBlockVersion,
+		PrevBlock:       best.Hash,
+		MerkleRoot:      *merkles[len(merkles)-1],
+		Timestamp:       ts,
+		Bits:            reqDifficulty,
+		PriceDerivation: float64(g.priceSource.PriceToMine()),
 	}
 	for _, tx := range blockTxns {
 		if err := msgBlock.AddTransaction(tx.MsgTx()); err != nil {
@@ -876,7 +998,7 @@ mempoolLoop:
 	// chain with no issues.
 	block := util.NewBlock(&msgBlock)
 	block.SetHeight(nextBlockHeight)
-	if err := g.chain.CheckConnectBlockTemplate(block); err != nil {
+	if err := g.chain.CheckConnectBlockTemplate(block, g.chainParams); err != nil {
 		return nil, err
 	}
 
@@ -893,6 +1015,93 @@ mempoolLoop:
 		ValidPayAddress:   payToAddress != nil,
 		WitnessCommitment: witnessCommitment,
 	}, nil
+}
+
+func (g *BlkTmplGenerator) orderbookLoop(sourceOdrs []*OdrDesc, nextBlockHeight int32, dependers map[chainhash.Hash]map[chainhash.Hash]*txPrioItem, priorityQueue *txPriorityQueue, blockUtxos *blockchain.UtxoViewpoint) {
+
+membookLoop:
+	for _, odrDesc := range sourceOdrs {
+		// A block can't have more than one coinbase or contain
+		// non-finalized orders.
+		tx := odrDesc.Tx
+		if blockchain.IsCoinBase(tx) {
+			log.Tracef("Order cannot be coinbase %s", tx.Hash())
+			continue
+		}
+		if !blockchain.IsFinalizedTransaction(tx, nextBlockHeight,
+			g.timeSource.AdjustedTime()) {
+
+			log.Tracef("Skipping non-finalized odr %s", tx.Hash())
+			continue
+		}
+
+		// Fetch all of the utxos referenced by the this order.
+		// NOTE: This intentionally does not fetch inputs from the
+		// mempool since a order which depends on other
+		// orders in the mempool must come after those
+		// dependencies in the final generated block.
+		utxos, err := g.chain.FetchUtxoView(tx)
+		if err != nil {
+			log.Warnf("Unable to fetch utxo view for tx %s: %v",
+				tx.Hash(), err)
+			continue
+		}
+
+		// Setup dependencies for any orders which reference
+		// other orders in the mempool so they can be properly
+		// ordered below.
+		prioItem := &txPrioItem{tx: tx}
+		for _, txIn := range tx.MsgTx().TxIn {
+			originHash := &txIn.PreviousOutPoint.Hash
+			entry := utxos.LookupEntry(txIn.PreviousOutPoint)
+			if entry == nil || entry.IsSpent() {
+				if !g.txSource.HaveTransaction(originHash) {
+					log.Tracef("Skipping odr %s because it "+
+						"references unspent output %s "+
+						"which is not available",
+						tx.Hash(), txIn.PreviousOutPoint)
+					continue membookLoop
+				}
+
+				// The order is referencing another
+				// order in the source pool, so setup an
+				// ordering dependency.
+				deps, exists := dependers[*originHash]
+				if !exists {
+					deps = make(map[chainhash.Hash]*txPrioItem)
+					dependers[*originHash] = deps
+				}
+				deps[*prioItem.tx.Hash()] = prioItem
+				if prioItem.dependsOn == nil {
+					prioItem.dependsOn = make(
+						map[chainhash.Hash]struct{})
+				}
+				prioItem.dependsOn[*originHash] = struct{}{}
+
+				// Skip the check below. We already know the
+				// referenced order is available.
+				continue
+			}
+		}
+
+		// Order always have maximum priority
+		prioItem.priority = math.MaxFloat64
+
+		// Calculate the fee in Satoshi/kB.
+		prioItem.feePerKB = 0
+		prioItem.fee = 0
+
+		// Add the order to the priority queue to mark it ready
+		// for inclusion in the block unless it has dependencies.
+		if prioItem.dependsOn == nil {
+			heap.Push(priorityQueue, prioItem)
+		}
+
+		// Merge the referenced outputs from the input orders to
+		// this order into the block utxo view.  This allows the
+		// code below to avoid a second lookup.
+		mergeUtxoView(blockUtxos, utxos)
+	}
 }
 
 // UpdateBlockTime updates the timestamp in the header of the passed block to

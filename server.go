@@ -214,6 +214,7 @@ type server struct {
 	syncManager          *netsync.SyncManager
 	chain                *blockchain.BlockChain
 	txMemPool            *mempool.TxPool
+	odrMemBook           *mempool.OdrBook
 	cpuMiner             *cpuminer.CPUMiner
 	modifyRebroadcastInv chan interface{}
 	newPeers             chan *serverPeer
@@ -228,6 +229,7 @@ type server struct {
 	nat                  NAT
 	db                   database.DB
 	timeSource           blockchain.MedianTimeSource
+	priceSource          blockchain.FeedPriceSource
 	services             wire.ServiceFlag
 
 	// The following fields are used for optional indexes.  They will be nil
@@ -256,20 +258,22 @@ type serverPeer struct {
 
 	*peer.Peer
 
-	connReq        *connmgr.ConnReq
-	server         *server
-	persistent     bool
-	continueHash   *chainhash.Hash
-	relayMtx       sync.Mutex
-	disableRelayTx bool
-	sentAddrs      bool
-	isWhitelisted  bool
-	filter         *bloom.Filter
-	knownAddresses map[string]struct{}
-	banScore       connmgr.DynamicBanScore
-	quit           chan struct{}
+	connReq           *connmgr.ConnReq
+	server            *server
+	persistent        bool
+	continueHash      *chainhash.Hash
+	relayMtx          sync.Mutex
+	disableRelayTx    bool
+	disableRelayOrder bool
+	sentAddrs         bool
+	isWhitelisted     bool
+	filter            *bloom.Filter
+	knownAddresses    map[string]struct{}
+	banScore          connmgr.DynamicBanScore
+	quit              chan struct{}
 	// The following chans are used to sync blockmanager and server.
 	txProcessed    chan struct{}
+	odrProcessed   chan struct{}
 	blockProcessed chan struct{}
 }
 
@@ -283,6 +287,7 @@ func newServerPeer(s *server, isPersistent bool) *serverPeer {
 		knownAddresses: make(map[string]struct{}),
 		quit:           make(chan struct{}),
 		txProcessed:    make(chan struct{}, 1),
+		odrProcessed:   make(chan struct{}, 1),
 		blockProcessed: make(chan struct{}, 1),
 	}
 }
@@ -322,6 +327,25 @@ func (sp *serverPeer) setDisableRelayTx(disable bool) {
 func (sp *serverPeer) relayTxDisabled() bool {
 	sp.relayMtx.Lock()
 	isDisabled := sp.disableRelayTx
+	sp.relayMtx.Unlock()
+
+	return isDisabled
+}
+
+// setDisableRelayOrder toggles relaying of orders for the given peer.
+// It is safe for concurrent access.
+func (sp *serverPeer) setDisableRelayOrder(disable bool) {
+	sp.relayMtx.Lock()
+	sp.disableRelayOrder = disable
+	sp.relayMtx.Unlock()
+}
+
+// relayOrderDisabled returns whether or not relaying of orders for the given
+// peer is disabled.
+// It is safe for concurrent access.
+func (sp *serverPeer) relayOrderDisabled() bool {
+	sp.relayMtx.Lock()
+	isDisabled := sp.disableRelayOrder
 	sp.relayMtx.Unlock()
 
 	return isDisabled
@@ -569,6 +593,81 @@ func (sp *serverPeer) OnTx(_ *peer.Peer, msg *wire.MsgTx) {
 	<-sp.txProcessed
 }
 
+// OnMemBook is invoked when a peer receives a mempool bitcoin message.
+// It creates and sends an inventory message with the contents of the memory
+// pool up to the maximum inventory allowed per message.  When the peer has a
+// bloom filter loaded, the contents are filtered accordingly.
+func (sp *serverPeer) OnMemBook(_ *peer.Peer, msg *wire.MsgMemBook) {
+	// Only allow mempool requests if the server has bloom filtering
+	// enabled.
+	if sp.server.services&wire.SFNodeBloom != wire.SFNodeBloom {
+		peerLog.Debugf("peer %v sent mempool request with bloom "+
+			"filtering disabled -- disconnecting", sp)
+		sp.Disconnect()
+		return
+	}
+
+	// A decaying ban score increase is applied to prevent flooding.
+	// The ban score accumulates and passes the ban threshold if a burst of
+	// mempool messages comes from a peer. The score decays each minute to
+	// half of its value.
+	sp.addBanScore(0, 33, "mempool")
+
+	// Generate inventory message with the available orders in the
+	// order memory pool.  Limit it to the max allowed inventory
+	// per message.  The NewMsgInvSizeHint function automatically limits
+	// the passed hint to the maximum allowed, so it's safe to pass it
+	// without double checking it here.
+	odrMemBook := sp.server.odrMemBook
+	orderDescs := odrMemBook.OdrDescs()
+	invMsg := wire.NewMsgInvSizeHint(uint(len(orderDescs)))
+
+	for _, orderDesc := range orderDescs {
+		// Either add all orders when there is no bloom filter,
+		// or only the orders that match the filter when there is
+		// one.
+		if !sp.filter.IsLoaded() || sp.filter.MatchOdrAndUpdate(orderDesc.Odr) {
+			iv := wire.NewInvVect(wire.InvTypeOdr, orderDesc.Odr.Hash())
+			invMsg.AddInvVect(iv)
+			if len(invMsg.InvList)+1 > wire.MaxInvPerMsg {
+				break
+			}
+		}
+	}
+
+	// Send the inventory message if there is anything to send.
+	if len(invMsg.InvList) > 0 {
+		sp.QueueMessage(invMsg, nil)
+	}
+}
+
+// OnOdr is invoked when a peer receives a order bitcoin message.  It blocks
+// until the bitcoin order has been fully processed.  Unlock the block
+// handler this does not serialize all orders through a single thread
+// orders don't rely on the previous one in a linear fashion like blocks.
+func (sp *serverPeer) OnOdr(_ *peer.Peer, msg *wire.MsgOdr) {
+	if cfg.BlocksOnly {
+		peerLog.Tracef("Ignoring order %v from %v - blocksonly enabled",
+			msg.TxHash(), sp)
+		return
+	}
+
+	// Add the order to the known inventory for the peer.
+	// Convert the raw MsgOdr to a util.Odr which provides some convenience
+	// methods and things such as hash caching.
+	order := util.NewOdr(msg)
+	iv := wire.NewInvVect(wire.InvTypeOdr, order.Hash())
+	sp.AddKnownInventory(iv)
+
+	// Queue the order up to be handled by the sync manager and
+	// intentionally block further receives until the order is fully
+	// processed and known good or bad.  This helps prevent a malicious peer
+	// from queuing up a bunch of bad orders before disconnecting (or
+	// being disconnected) and wasting memory.
+	sp.server.syncManager.QueueOdr(order, sp.Peer, sp.odrProcessed)
+	<-sp.odrProcessed
+}
+
 // OnBlock is invoked when a peer receives a block bitcoin message.  It
 // blocks until the bitcoin block has been fully processed.
 func (sp *serverPeer) OnBlock(_ *peer.Peer, msg *wire.MsgBlock, buf []byte) {
@@ -615,6 +714,16 @@ func (sp *serverPeer) OnInv(_ *peer.Peer, msg *wire.MsgInv) {
 			if sp.ProtocolVersion() >= wire.BIP0037Version {
 				peerLog.Infof("Peer %v is announcing "+
 					"transactions -- disconnecting", sp)
+				sp.Disconnect()
+				return
+			}
+			continue
+		} else if invVect.Type == wire.InvTypeOdr {
+			peerLog.Tracef("Ignoring order %v in inv from %v -- "+
+				"blocksonly enabled", invVect.Hash, sp)
+			if sp.ProtocolVersion() >= wire.BIP0037Version {
+				peerLog.Infof("Peer %v is announcing "+
+					"orders -- disconnecting", sp)
 				sp.Disconnect()
 				return
 			}
@@ -676,6 +785,10 @@ func (sp *serverPeer) OnGetData(_ *peer.Peer, msg *wire.MsgGetData) {
 			err = sp.server.pushTxMsg(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
 		case wire.InvTypeTx:
 			err = sp.server.pushTxMsg(sp, &iv.Hash, c, waitChan, wire.BaseEncoding)
+		case wire.InvTypeWitnessOdr:
+			err = sp.server.pushOrderMsg(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
+		case wire.InvTypeOdr:
+			err = sp.server.pushOrderMsg(sp, &iv.Hash, c, waitChan, wire.BaseEncoding)
 		case wire.InvTypeWitnessBlock:
 			err = sp.server.pushBlockMsg(sp, &iv.Hash, c, waitChan, wire.WitnessEncoding)
 		case wire.InvTypeBlock:
@@ -1367,6 +1480,15 @@ func (s *server) relayTransactions(txns []*mempool.TxDesc) {
 	}
 }
 
+// relayOrders generates and relays inventory vectors for all of the
+// passed orders to all connected peers.
+func (s *server) relayOrders(orders []*mempool.OdrDesc) {
+	for _, oD := range orders {
+		iv := wire.NewInvVect(wire.InvTypeOdr, oD.Tx.Hash())
+		s.RelayInventory(iv, oD)
+	}
+}
+
 // AnnounceNewTransactions generates and relays inventory vectors and notifies
 // both websocket and getblocktemplate long poll clients of the passed
 // transactions.  This function should be called whenever new transactions
@@ -1383,6 +1505,22 @@ func (s *server) AnnounceNewTransactions(txns []*mempool.TxDesc) {
 	}
 }
 
+// AnnounceNewOrders generates and relays inventory vectors and notifies
+// both websocket and getblocktemplate long poll clients of the passed
+// orders.  This function should be called whenever new orders
+// are added to the mempool.
+func (s *server) AnnounceNewOrders(orders []*mempool.OdrDesc) {
+	// Generate and relay inventory vectors for all newly accepted
+	// orders.
+	s.relayOrders(orders)
+
+	// Notify both websocket and getblocktemplate long poll clients of all
+	// newly accepted orders.
+	if s.rpcServer != nil {
+		s.rpcServer.NotifyNewOrders(orders)
+	}
+}
+
 // Transaction has one confirmation on the main chain. Now we can mark it as no
 // longer needing rebroadcasting.
 func (s *server) TransactionConfirmed(tx *util.Tx) {
@@ -1392,6 +1530,18 @@ func (s *server) TransactionConfirmed(tx *util.Tx) {
 	}
 
 	iv := wire.NewInvVect(wire.InvTypeTx, tx.Hash())
+	s.RemoveRebroadcastInventory(iv)
+}
+
+// Order has been filled with one confirmation on the main chain.
+// Now we can mark it as no longer needing rebroadcasting.
+func (s *server) OrderFilled(order *util.Odr) {
+	// Rebroadcasting is only necessary when the RPC server is active.
+	if s.rpcServer == nil {
+		return
+	}
+
+	iv := wire.NewInvVect(wire.InvTypeOdr, order.Hash())
 	s.RemoveRebroadcastInventory(iv)
 }
 
@@ -1420,6 +1570,34 @@ func (s *server) pushTxMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<-
 	}
 
 	sp.QueueMessageWithEncoding(tx.MsgTx(), doneChan, encoding)
+
+	return nil
+}
+
+// pushOrderMsg sends a order message for the provided transaction hash to the
+// connected peer.  An error is returned if the transaction hash is not known.
+func (s *server) pushOrderMsg(sp *serverPeer, hash *chainhash.Hash, doneChan chan<- struct{},
+	waitChan <-chan struct{}, encoding wire.MessageEncoding) error {
+
+	// Attempt to fetch the requested transaction from the pool.  A
+	// call could be made to check for existence first, but simply trying
+	// to fetch a missing transaction results in the same behavior.
+	order, err := s.odrMemBook.FetchOrder(hash)
+	if err != nil {
+		peerLog.Tracef("Unable to fetch order %v from order book: %v", hash, err)
+
+		if doneChan != nil {
+			doneChan <- struct{}{}
+		}
+		return err
+	}
+
+	// Once we have fetched data wait for any previous operation to finish.
+	if waitChan != nil {
+		<-waitChan
+	}
+
+	sp.QueueMessageWithEncoding(order.MsgTx(), doneChan, encoding)
 
 	return nil
 }
@@ -1750,6 +1928,38 @@ func (s *server) handleRelayInvMsg(state *peerState, msg relayMsg) {
 			}
 		}
 
+		if msg.invVect.Type == wire.InvTypeOdr {
+			// Don't relay the order to the peer when it has
+			// order relaying disabled.
+			if sp.relayOrderDisabled() {
+				return
+			}
+
+			orderD, ok := msg.data.(*mempool.OdrDesc)
+			if !ok {
+				peerLog.Warnf("Underlying data for order inv "+
+					"relay is not a *membook.OdrDesc: %T",
+					msg.data)
+				return
+			}
+
+			// Don't relay the order if the order fee-per-kb
+			// is less than the peer's feefilter.
+			// TODO: implement order fee
+			// feeFilter := atomic.LoadInt64(&sp.feeFilter)
+			// if feeFilter > 0 && orderD.FeePerKB < feeFilter {
+			// 	return
+			// }
+
+			// Don't relay the order if there is a bloom
+			// filter loaded and the order doesn't match it.
+			if sp.filter.IsLoaded() {
+				if !sp.filter.MatchOdrAndUpdate(orderD.Odr) {
+					return
+				}
+			}
+		}
+
 		// Queue the inventory to be relayed with the next batch.
 		// It will be ignored if the peer is already known to
 		// have the inventory.
@@ -1951,6 +2161,8 @@ func newPeerConfig(sp *serverPeer) *peer.Config {
 			OnVersion:      sp.OnVersion,
 			OnMemPool:      sp.OnMemPool,
 			OnTx:           sp.OnTx,
+			OnMemBook:      sp.OnMemBook,
+			OnOdr:          sp.OnOdr,
 			OnBlock:        sp.OnBlock,
 			OnInv:          sp.OnInv,
 			OnHeaders:      sp.OnHeaders,
@@ -2577,6 +2789,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		nat:                  nat,
 		db:                   db,
 		timeSource:           blockchain.NewMedianTime(),
+		priceSource:          blockchain.NewFeedPrice(chainParams.TargetTimePerBlock),
 		services:             services,
 		sigCache:             txscript.NewSigCache(cfg.SigCacheMaxSize),
 		hashCache:            txscript.NewHashCache(cfg.SigCacheMaxSize),
@@ -2698,11 +2911,13 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		FeeEstimator:       s.feeEstimator,
 	}
 	s.txMemPool = mempool.New(&txC)
+	s.odrMemBook = mempool.NewMemBook(&txC)
 
 	s.syncManager, err = netsync.New(&netsync.Config{
 		PeerNotifier:       &s,
 		Chain:              s.chain,
 		TxMemPool:          s.txMemPool,
+		OdrMemBook:         s.odrMemBook,
 		ChainParams:        s.chainParams,
 		DisableCheckpoints: cfg.DisableCheckpoints,
 		MaxPeers:           cfg.MaxPeers,
@@ -2726,15 +2941,16 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		TxMinFreeFee:      cfg.minRelayTxFee,
 	}
 	blockTemplateGenerator := mining.NewBlkTmplGenerator(&policy,
-		s.chainParams, s.txMemPool, s.chain, s.timeSource,
-		s.sigCache, s.hashCache)
+		s.chainParams, s.odrMemBook, s.txMemPool, s.chain, s.timeSource,
+		s.priceSource, s.sigCache, s.hashCache)
 	s.cpuMiner = cpuminer.New(&cpuminer.Config{
 		ChainParams:            chainParams,
 		BlockTemplateGenerator: blockTemplateGenerator,
-		MiningAddrs:            cfg.miningAddrs,
+		MiningKey:              cfg.miningKey,
 		ProcessBlock:           s.syncManager.ProcessBlock,
 		ConnectedCount:         s.ConnectedCount,
 		IsCurrent:              s.syncManager.IsCurrent,
+		SingleNode:             cfg.SingleNode,
 	})
 
 	// Only setup a function to return new addresses to connect to when
@@ -2743,8 +2959,9 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 	// specified peers and actively avoid advertising and connecting to
 	// discovered peers in order to prevent it from becoming a public test
 	// network.
+	// Unless we are in single node mode.
 	var newAddressFunc func() (net.Addr, error)
-	if !cfg.SimNet && len(cfg.ConnectPeers) == 0 {
+	if !cfg.SingleNode && !cfg.SimNet && len(cfg.ConnectPeers) == 0 {
 		newAddressFunc = func() (net.Addr, error) {
 			for tries := 0; tries < 100; tries++ {
 				addr := s.addrManager.GetAddress()
@@ -2836,10 +3053,12 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 			ConnMgr:      &rpcConnManager{&s},
 			SyncMgr:      &rpcSyncMgr{&s, s.syncManager},
 			TimeSource:   s.timeSource,
+			PriceSource:  s.priceSource,
 			Chain:        s.chain,
 			ChainParams:  chainParams,
 			DB:           db,
 			TxMemPool:    s.txMemPool,
+			OdrMemBook:   s.odrMemBook,
 			Generator:    blockTemplateGenerator,
 			CPUMiner:     s.cpuMiner,
 			TxIndex:      s.txIndex,

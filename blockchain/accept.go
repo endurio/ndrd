@@ -6,6 +6,7 @@ package blockchain
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/endurio/ndrd/database"
 	"github.com/endurio/ndrd/util"
@@ -67,16 +68,23 @@ func (b *BlockChain) maybeAcceptBlock(block *util.Block, flags BehaviorFlags) (b
 	newNode := newBlockNode(blockHeader, prevNode)
 	newNode.status = statusDataStored
 
-	b.index.AddNode(newNode)
-	err = b.index.flushToDB()
-	if err != nil {
-		return false, err
+	rate, err := b.checkNewAbsorptionRate(newNode)
+	if !math.IsNaN(rate) {
+		log.Infof("A new absorption with rate %v is triggered by block height %v (%v)",
+			rate, block.Height(), block.Hash())
+		b.index.SetStatusFlags(newNode, statusAbsorption)
 	}
 
 	// Connect the passed block to the chain while respecting proper chain
 	// selection according to the chain with the most proof of work.  This
 	// also handles validation of the transaction scripts.
 	isMainChain, err := b.connectBestChain(newNode, block, flags)
+	if err != nil {
+		return false, err
+	}
+
+	b.index.AddNode(newNode)
+	err = b.index.flushToDB()
 	if err != nil {
 		return false, err
 	}

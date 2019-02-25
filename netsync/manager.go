@@ -16,9 +16,10 @@ import (
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/database"
 	"github.com/endurio/ndrd/mempool"
+	"github.com/endurio/ndrd/mining"
 	peerpkg "github.com/endurio/ndrd/peer"
-	"github.com/endurio/ndrd/wire"
 	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/wire"
 )
 
 const (
@@ -38,6 +39,10 @@ const (
 	// maxRequestedTxns is the maximum number of requested transactions
 	// hashes to store in memory.
 	maxRequestedTxns = wire.MaxInvPerMsg
+
+	// maxRequestedOrders is the maximum number of requested orders
+	// hashes to store in memory.
+	maxRequestedOrders = wire.MaxInvPerMsg
 )
 
 // zeroHash is the zero value hash (all zeros).  It is defined as a convenience.
@@ -81,6 +86,13 @@ type txMsg struct {
 	tx    *util.Tx
 	peer  *peerpkg.Peer
 	reply chan struct{}
+}
+
+// orderMsg packages an order message and the peer it came from together
+// so the block handler has access to that information.
+type orderMsg struct {
+	*txMsg
+	order *util.Odr
 }
 
 // getSyncPeerMsg is a message type to be sent across the message channel for
@@ -135,6 +147,7 @@ type peerSyncState struct {
 	syncCandidate   bool
 	requestQueue    []*wire.InvVect
 	requestedTxns   map[chainhash.Hash]struct{}
+	requestedOrders map[chainhash.Hash]struct{}
 	requestedBlocks map[chainhash.Hash]struct{}
 }
 
@@ -149,6 +162,7 @@ type SyncManager struct {
 	shutdown       int32
 	chain          *blockchain.BlockChain
 	txMemPool      *mempool.TxPool
+	odrMemBook     *mempool.OdrBook
 	chainParams    *chaincfg.Params
 	progressLogger *blockProgressLogger
 	msgChan        chan interface{}
@@ -158,6 +172,8 @@ type SyncManager struct {
 	// These fields should only be accessed from the blockHandler thread
 	rejectedTxns    map[chainhash.Hash]struct{}
 	requestedTxns   map[chainhash.Hash]struct{}
+	rejectedOrders  map[chainhash.Hash]struct{}
+	requestedOrders map[chainhash.Hash]struct{}
 	requestedBlocks map[chainhash.Hash]struct{}
 	syncPeer        *peerpkg.Peer
 	peerStates      map[*peerpkg.Peer]*peerSyncState
@@ -486,6 +502,73 @@ func (sm *SyncManager) handleTxMsg(tmsg *txMsg) {
 	}
 
 	sm.peerNotifier.AnnounceNewTransactions(acceptedTxs)
+}
+
+// handleOrderMsg handles order messages from all peers.
+func (sm *SyncManager) handleOrderMsg(omsg *orderMsg) {
+	peer := omsg.peer
+	state, exists := sm.peerStates[peer]
+	if !exists {
+		log.Warnf("Received order message from unknown peer %s", peer)
+		return
+	}
+
+	// NOTE:  BitcoinJ, and possibly other wallets, don't follow the spec of
+	// sending an inventory message and allowing the remote peer to decide
+	// whether or not they want to request the transaction via a getdata
+	// message.  Unfortunately, the reference implementation permits
+	// unrequested data, so it has allowed wallets that don't follow the
+	// spec to proliferate.  While this is not ideal, there is no check here
+	// to disconnect peers for sending unsolicited transactions to provide
+	// interoperability.
+	txHash := omsg.tx.Hash()
+
+	// Ignore transactions that we have already rejected.  Do not
+	// send a reject message here because if the transaction was already
+	// rejected, the transaction was unsolicited.
+	if _, exists = sm.rejectedOrders[*txHash]; exists {
+		log.Debugf("Ignoring unsolicited previously rejected "+
+			"order %v from %s", txHash, peer)
+		return
+	}
+
+	// Process the transaction to include validation, insertion in the
+	// memory pool, orphan handling, etc.
+	acceptedOrder, err := sm.odrMemBook.ProcessOrder(omsg.order)
+
+	// Remove transaction from request maps. Either the mempool/chain
+	// already knows about it and as such we shouldn't have any more
+	// instances of trying to fetch it, or we failed to insert and thus
+	// we'll retry next time we get an inv.
+	delete(state.requestedOrders, *txHash)
+	delete(sm.requestedOrders, *txHash)
+
+	if err != nil {
+		// Do not request this transaction again until a new block
+		// has been processed.
+		sm.rejectedOrders[*txHash] = struct{}{}
+		sm.limitMap(sm.rejectedOrders, maxRejectedTxns)
+
+		// When the error is a rule error, it means the transaction was
+		// simply rejected as opposed to something actually going wrong,
+		// so log it as such.  Otherwise, something really did go wrong,
+		// so log it as an actual error.
+		if _, ok := err.(mempool.RuleError); ok {
+			log.Debugf("Rejected order %v from %s: %v",
+				txHash, peer, err)
+		} else {
+			log.Errorf("Failed to process order %v: %v",
+				txHash, err)
+		}
+
+		// Convert the error into an appropriate reject message and
+		// send it.
+		code, reason := mempool.ErrToRejectErr(err)
+		peer.PushRejectMsg(wire.CmdOdr, code, reason, txHash, false)
+		return
+	}
+
+	sm.peerNotifier.AnnounceNewOrders([]*mempool.OdrDesc{acceptedOrder})
 }
 
 // current returns true if we believe we are synced with our peers, false if we
@@ -918,6 +1001,37 @@ func (sm *SyncManager) haveInventory(invVect *wire.InvVect) (bool, error) {
 		}
 
 		return false, nil
+
+	case wire.InvTypeWitnessOdr:
+		fallthrough
+	case wire.InvTypeOdr:
+		// Ask the order memory pool if the order is known
+		// to it in any form (main pool or orphan).
+		if sm.odrMemBook.HaveOrder(&invVect.Hash) {
+			return true, nil
+		}
+
+		// Check if the order exists from the point of view of the
+		// end of the main chain.  Note that this is only a best effort
+		// since it is expensive to check existence of every output and
+		// the only purpose of this check is to avoid downloading
+		// already known orders.  Only the first two outputs are
+		// checked because the vast majority of orders consist of
+		// two outputs where one is some form of "pay-to-somebody-else"
+		// and the other is a change output.
+		prevOut := wire.OutPoint{Hash: invVect.Hash}
+		for i := uint32(0); i < 2; i++ {
+			prevOut.Index = i
+			entry, err := sm.chain.FetchUtxoEntry(prevOut)
+			if err != nil {
+				return false, err
+			}
+			if entry != nil && !entry.IsSpent() {
+				return true, nil
+			}
+		}
+
+		return false, nil
 	}
 
 	// The requested inventory is is an unsupported type, so just claim
@@ -981,6 +1095,8 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 		case wire.InvTypeTx:
 		case wire.InvTypeWitnessBlock:
 		case wire.InvTypeWitnessTx:
+		case wire.InvTypeOdr:
+		case wire.InvTypeWitnessOdr:
 		default:
 			continue
 		}
@@ -1007,6 +1123,11 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 				// Skip the transaction if it has already been
 				// rejected.
 				if _, exists := sm.rejectedTxns[iv.Hash]; exists {
+					continue
+				}
+			} else if iv.Type == wire.InvTypeOdr {
+				// Skip the order if it has already been rejected.
+				if _, exists := sm.rejectedOrders[iv.Hash]; exists {
 					continue
 				}
 			}
@@ -1113,6 +1234,26 @@ func (sm *SyncManager) handleInvMsg(imsg *invMsg) {
 				gdmsg.AddInvVect(iv)
 				numRequested++
 			}
+
+		case wire.InvTypeWitnessOdr:
+			fallthrough
+		case wire.InvTypeOdr:
+			// Request the order if there is not already a
+			// pending request.
+			if _, exists := sm.requestedOrders[iv.Hash]; !exists {
+				sm.requestedOrders[iv.Hash] = struct{}{}
+				sm.limitMap(sm.requestedOrders, maxRequestedOrders)
+				state.requestedOrders[iv.Hash] = struct{}{}
+
+				// If the peer is capable, request the txn
+				// including all witness data.
+				if peer.IsWitnessEnabled() {
+					iv.Type = wire.InvTypeWitnessOdr
+				}
+
+				gdmsg.AddInvVect(iv)
+				numRequested++
+			}
 		}
 
 		if numRequested >= wire.MaxInvPerMsg {
@@ -1160,6 +1301,10 @@ out:
 
 			case *txMsg:
 				sm.handleTxMsg(msg)
+				msg.reply <- struct{}{}
+
+			case *orderMsg:
+				sm.handleOrderMsg(msg)
 				msg.reply <- struct{}{}
 
 			case *blockMsg:
@@ -1258,12 +1403,25 @@ func (sm *SyncManager) handleBlockchainNotification(notification *blockchain.Not
 		// transaction are NOT removed recursively because they are still
 		// valid.
 		for _, tx := range block.Transactions()[1:] {
-			sm.txMemPool.RemoveTransaction(tx, false)
-			sm.txMemPool.RemoveDoubleSpends(tx)
-			sm.txMemPool.RemoveOrphan(tx)
-			sm.peerNotifier.TransactionConfirmed(tx)
-			acceptedTxs := sm.txMemPool.ProcessOrphans(tx)
-			sm.peerNotifier.AnnounceNewTransactions(acceptedTxs)
+			txHash := tx.Hash()
+			if sm.txMemPool.HaveTransaction(txHash) {
+				sm.txMemPool.RemoveTransaction(tx, false)
+				sm.txMemPool.RemoveDoubleSpends(tx)
+				sm.odrMemBook.RemoveDoubleSpends(tx)
+				sm.txMemPool.RemoveOrphan(tx)
+				sm.peerNotifier.TransactionConfirmed(tx)
+				acceptedTxs := sm.txMemPool.ProcessOrphans(tx)
+				sm.peerNotifier.AnnounceNewTransactions(acceptedTxs)
+			} else if sm.odrMemBook.HaveOrder(txHash) {
+				odr := util.NewOdrFromTx(tx)
+				sm.odrMemBook.RemoveOrder(odr)
+				sm.txMemPool.RemoveDoubleSpends(tx)
+				sm.odrMemBook.RemoveDoubleSpends(tx)
+				sm.peerNotifier.OrderFilled(odr)
+				sm.peerNotifier.AnnounceNewOrders([]*mempool.OdrDesc{
+					&mempool.OdrDesc{OdrDesc: mining.OdrDesc{Odr: odr}},
+				})
+			}
 		}
 
 		// Register block with the fee estimator, if it exists.
@@ -1328,6 +1486,19 @@ func (sm *SyncManager) QueueTx(tx *util.Tx, peer *peerpkg.Peer, done chan struct
 	}
 
 	sm.msgChan <- &txMsg{tx: tx, peer: peer, reply: done}
+}
+
+// QueueOdr adds the passed order message and peer to the block handling
+// queue. Responds to the done channel argument after the order message is
+// processed.
+func (sm *SyncManager) QueueOdr(order *util.Odr, peer *peerpkg.Peer, done chan struct{}) {
+	// Don't accept more orders if we're shutting down.
+	if atomic.LoadInt32(&sm.shutdown) != 0 {
+		done <- struct{}{}
+		return
+	}
+
+	sm.msgChan <- &orderMsg{order: order, txMsg: &txMsg{peer: peer, reply: done}}
 }
 
 // QueueBlock adds the passed block message and peer to the block handling
@@ -1444,6 +1615,7 @@ func New(config *Config) (*SyncManager, error) {
 		peerNotifier:    config.PeerNotifier,
 		chain:           config.Chain,
 		txMemPool:       config.TxMemPool,
+		odrMemBook:      config.OdrMemBook,
 		chainParams:     config.ChainParams,
 		rejectedTxns:    make(map[chainhash.Hash]struct{}),
 		requestedTxns:   make(map[chainhash.Hash]struct{}),

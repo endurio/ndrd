@@ -11,8 +11,8 @@ import (
 	"github.com/endurio/ndrd/btcjson"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
-	"github.com/endurio/ndrd/wire"
 	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/wire"
 )
 
 // *****************************
@@ -173,7 +173,13 @@ func (r FutureListUnspentResult) Receive() ([]btcjson.ListUnspentResult, error) 
 //
 // See ListUnspent for the blocking version and more details.
 func (c *Client) ListUnspentAsync() FutureListUnspentResult {
-	cmd := btcjson.NewListUnspentCmd(nil, nil, nil)
+	cmd := btcjson.NewListUnspentCmd(nil, nil, nil, nil)
+	return c.sendCmd(cmd)
+}
+
+// ListUnspentTokenAsync returns ...
+func (c *Client) ListUnspentTokenAsync(token string) FutureListUnspentResult {
+	cmd := btcjson.NewListUnspentCmd(&token, nil, nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -182,8 +188,8 @@ func (c *Client) ListUnspentAsync() FutureListUnspentResult {
 // on the returned instance.
 //
 // See ListUnspentMin for the blocking version and more details.
-func (c *Client) ListUnspentMinAsync(minConf int) FutureListUnspentResult {
-	cmd := btcjson.NewListUnspentCmd(&minConf, nil, nil)
+func (c *Client) ListUnspentMinAsync(token string, minConf int) FutureListUnspentResult {
+	cmd := btcjson.NewListUnspentCmd(&token, &minConf, nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -192,8 +198,8 @@ func (c *Client) ListUnspentMinAsync(minConf int) FutureListUnspentResult {
 // on the returned instance.
 //
 // See ListUnspentMinMax for the blocking version and more details.
-func (c *Client) ListUnspentMinMaxAsync(minConf, maxConf int) FutureListUnspentResult {
-	cmd := btcjson.NewListUnspentCmd(&minConf, &maxConf, nil)
+func (c *Client) ListUnspentMinMaxAsync(token string, minConf, maxConf int) FutureListUnspentResult {
+	cmd := btcjson.NewListUnspentCmd(&token, &minConf, &maxConf, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -202,13 +208,13 @@ func (c *Client) ListUnspentMinMaxAsync(minConf, maxConf int) FutureListUnspentR
 // function on the returned instance.
 //
 // See ListUnspentMinMaxAddresses for the blocking version and more details.
-func (c *Client) ListUnspentMinMaxAddressesAsync(minConf, maxConf int, addrs []util.Address) FutureListUnspentResult {
+func (c *Client) ListUnspentMinMaxAddressesAsync(token string, minConf, maxConf int, addrs []util.Address) FutureListUnspentResult {
 	addrStrs := make([]string, 0, len(addrs))
 	for _, a := range addrs {
 		addrStrs = append(addrStrs, a.EncodeAddress())
 	}
 
-	cmd := btcjson.NewListUnspentCmd(&minConf, &maxConf, &addrStrs)
+	cmd := btcjson.NewListUnspentCmd(&token, &minConf, &maxConf, &addrStrs)
 	return c.sendCmd(cmd)
 }
 
@@ -219,25 +225,30 @@ func (c *Client) ListUnspent() ([]btcjson.ListUnspentResult, error) {
 	return c.ListUnspentAsync().Receive()
 }
 
+// ListUnspentToken returns ...
+func (c *Client) ListUnspentToken(token string) ([]btcjson.ListUnspentResult, error) {
+	return c.ListUnspentTokenAsync(token).Receive()
+}
+
 // ListUnspentMin returns all unspent transaction outputs known to a wallet,
 // using the specified number of minimum conformations and default number of
 // maximum confiramtions (999999) as a filter.
-func (c *Client) ListUnspentMin(minConf int) ([]btcjson.ListUnspentResult, error) {
-	return c.ListUnspentMinAsync(minConf).Receive()
+func (c *Client) ListUnspentMin(token string, minConf int) ([]btcjson.ListUnspentResult, error) {
+	return c.ListUnspentMinAsync(token, minConf).Receive()
 }
 
 // ListUnspentMinMax returns all unspent transaction outputs known to a wallet,
 // using the specified number of minimum and maximum number of confirmations as
 // a filter.
-func (c *Client) ListUnspentMinMax(minConf, maxConf int) ([]btcjson.ListUnspentResult, error) {
-	return c.ListUnspentMinMaxAsync(minConf, maxConf).Receive()
+func (c *Client) ListUnspentMinMax(token string, minConf, maxConf int) ([]btcjson.ListUnspentResult, error) {
+	return c.ListUnspentMinMaxAsync(token, minConf, maxConf).Receive()
 }
 
 // ListUnspentMinMaxAddresses returns all unspent transaction outputs that pay
 // to any of specified addresses in a wallet using the specified number of
 // minimum and maximum number of confirmations as a filter.
-func (c *Client) ListUnspentMinMaxAddresses(minConf, maxConf int, addrs []util.Address) ([]btcjson.ListUnspentResult, error) {
-	return c.ListUnspentMinMaxAddressesAsync(minConf, maxConf, addrs).Receive()
+func (c *Client) ListUnspentMinMaxAddresses(token string, minConf, maxConf int, addrs []util.Address) ([]btcjson.ListUnspentResult, error) {
+	return c.ListUnspentMinMaxAddressesAsync(token, minConf, maxConf, addrs).Receive()
 }
 
 // FutureListSinceBlockResult is a future promise to deliver the result of a
@@ -471,7 +482,7 @@ func (r FutureSendToAddressResult) Receive() (*chainhash.Hash, error) {
 // See SendToAddress for the blocking version and more details.
 func (c *Client) SendToAddressAsync(address util.Address, amount util.Amount) FutureSendToAddressResult {
 	addr := address.EncodeAddress()
-	cmd := btcjson.NewSendToAddressCmd(addr, amount.ToBTC(), nil, nil)
+	cmd := btcjson.NewSendToAddressCmd(addr, amount.ToBTC(), nil, nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -487,17 +498,29 @@ func (c *Client) SendToAddress(address util.Address, amount util.Amount) (*chain
 	return c.SendToAddressAsync(address, amount).Receive()
 }
 
+// SendToAddressTokenAsync returns
+func (c *Client) SendToAddressTokenAsync(address util.Address, amount util.Amount, token string) FutureSendToAddressResult {
+	addr := address.EncodeAddress()
+	cmd := btcjson.NewSendToAddressCmd(addr, amount.ToBTC(), &token, nil, nil)
+	return c.sendCmd(cmd)
+}
+
+// SendToAddressToken sends
+func (c *Client) SendToAddressToken(address util.Address, amount util.Amount, token string) (*chainhash.Hash, error) {
+	return c.SendToAddressTokenAsync(address, amount, token).Receive()
+}
+
 // SendToAddressCommentAsync returns an instance of a type that can be used to
 // get the result of the RPC at some future time by invoking the Receive
 // function on the returned instance.
 //
 // See SendToAddressComment for the blocking version and more details.
 func (c *Client) SendToAddressCommentAsync(address util.Address,
-	amount util.Amount, comment,
+	amount util.Amount, token, comment,
 	commentTo string) FutureSendToAddressResult {
 
 	addr := address.EncodeAddress()
-	cmd := btcjson.NewSendToAddressCmd(addr, amount.ToBTC(), &comment,
+	cmd := btcjson.NewSendToAddressCmd(addr, amount.ToBTC(), &token, &comment,
 		&commentTo)
 	return c.sendCmd(cmd)
 }
@@ -514,8 +537,8 @@ func (c *Client) SendToAddressCommentAsync(address util.Address,
 //
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
-func (c *Client) SendToAddressComment(address util.Address, amount util.Amount, comment, commentTo string) (*chainhash.Hash, error) {
-	return c.SendToAddressCommentAsync(address, amount, comment,
+func (c *Client) SendToAddressComment(address util.Address, amount util.Amount, token, comment, commentTo string) (*chainhash.Hash, error) {
+	return c.SendToAddressCommentAsync(address, amount, token, comment,
 		commentTo).Receive()
 }
 
@@ -548,9 +571,9 @@ func (r FutureSendFromResult) Receive() (*chainhash.Hash, error) {
 // returned instance.
 //
 // See SendFrom for the blocking version and more details.
-func (c *Client) SendFromAsync(fromAccount string, toAddress util.Address, amount util.Amount) FutureSendFromResult {
+func (c *Client) SendFromAsync(fromAccount string, toAddress util.Address, amount util.Amount, token string) FutureSendFromResult {
 	addr := toAddress.EncodeAddress()
-	cmd := btcjson.NewSendFromCmd(fromAccount, addr, amount.ToBTC(), nil,
+	cmd := btcjson.NewSendFromCmd(fromAccount, addr, amount.ToBTC(), &token, nil,
 		nil, nil)
 	return c.sendCmd(cmd)
 }
@@ -563,8 +586,8 @@ func (c *Client) SendFromAsync(fromAccount string, toAddress util.Address, amoun
 //
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
-func (c *Client) SendFrom(fromAccount string, toAddress util.Address, amount util.Amount) (*chainhash.Hash, error) {
-	return c.SendFromAsync(fromAccount, toAddress, amount).Receive()
+func (c *Client) SendFrom(fromAccount string, toAddress util.Address, amount util.Amount, token string) (*chainhash.Hash, error) {
+	return c.SendFromAsync(fromAccount, toAddress, amount, token).Receive()
 }
 
 // SendFromMinConfAsync returns an instance of a type that can be used to get
@@ -572,9 +595,9 @@ func (c *Client) SendFrom(fromAccount string, toAddress util.Address, amount uti
 // the returned instance.
 //
 // See SendFromMinConf for the blocking version and more details.
-func (c *Client) SendFromMinConfAsync(fromAccount string, toAddress util.Address, amount util.Amount, minConfirms int) FutureSendFromResult {
+func (c *Client) SendFromMinConfAsync(fromAccount string, toAddress util.Address, amount util.Amount, token string, minConfirms int) FutureSendFromResult {
 	addr := toAddress.EncodeAddress()
-	cmd := btcjson.NewSendFromCmd(fromAccount, addr, amount.ToBTC(),
+	cmd := btcjson.NewSendFromCmd(fromAccount, addr, amount.ToBTC(), &token,
 		&minConfirms, nil, nil)
 	return c.sendCmd(cmd)
 }
@@ -588,8 +611,8 @@ func (c *Client) SendFromMinConfAsync(fromAccount string, toAddress util.Address
 //
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
-func (c *Client) SendFromMinConf(fromAccount string, toAddress util.Address, amount util.Amount, minConfirms int) (*chainhash.Hash, error) {
-	return c.SendFromMinConfAsync(fromAccount, toAddress, amount,
+func (c *Client) SendFromMinConf(fromAccount string, toAddress util.Address, amount util.Amount, token string, minConfirms int) (*chainhash.Hash, error) {
+	return c.SendFromMinConfAsync(fromAccount, toAddress, amount, token,
 		minConfirms).Receive()
 }
 
@@ -599,11 +622,11 @@ func (c *Client) SendFromMinConf(fromAccount string, toAddress util.Address, amo
 //
 // See SendFromComment for the blocking version and more details.
 func (c *Client) SendFromCommentAsync(fromAccount string,
-	toAddress util.Address, amount util.Amount, minConfirms int,
+	toAddress util.Address, amount util.Amount, token string, minConfirms int,
 	comment, commentTo string) FutureSendFromResult {
 
 	addr := toAddress.EncodeAddress()
-	cmd := btcjson.NewSendFromCmd(fromAccount, addr, amount.ToBTC(),
+	cmd := btcjson.NewSendFromCmd(fromAccount, addr, amount.ToBTC(), &token,
 		&minConfirms, &comment, &commentTo)
 	return c.sendCmd(cmd)
 }
@@ -620,10 +643,10 @@ func (c *Client) SendFromCommentAsync(fromAccount string,
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
 func (c *Client) SendFromComment(fromAccount string, toAddress util.Address,
-	amount util.Amount, minConfirms int,
+	amount util.Amount, token string, minConfirms int,
 	comment, commentTo string) (*chainhash.Hash, error) {
 
-	return c.SendFromCommentAsync(fromAccount, toAddress, amount,
+	return c.SendFromCommentAsync(fromAccount, toAddress, amount, token,
 		minConfirms, comment, commentTo).Receive()
 }
 
@@ -661,7 +684,7 @@ func (c *Client) SendManyAsync(fromAccount string, amounts map[util.Address]util
 	for addr, amount := range amounts {
 		convertedAmounts[addr.EncodeAddress()] = amount.ToBTC()
 	}
-	cmd := btcjson.NewSendManyCmd(fromAccount, convertedAmounts, nil, nil)
+	cmd := btcjson.NewSendManyCmd(fromAccount, convertedAmounts, nil, nil, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -677,13 +700,28 @@ func (c *Client) SendMany(fromAccount string, amounts map[util.Address]util.Amou
 	return c.SendManyAsync(fromAccount, amounts).Receive()
 }
 
+// SendManyTokenAsync returns
+func (c *Client) SendManyTokenAsync(fromAccount string, amounts map[util.Address]util.Amount, token string) FutureSendManyResult {
+	convertedAmounts := make(map[string]float64, len(amounts))
+	for addr, amount := range amounts {
+		convertedAmounts[addr.EncodeAddress()] = amount.ToBTC()
+	}
+	cmd := btcjson.NewSendManyCmd(fromAccount, convertedAmounts, &token, nil, nil)
+	return c.sendCmd(cmd)
+}
+
+// SendManyToken sends
+func (c *Client) SendManyToken(fromAccount string, amounts map[util.Address]util.Amount, token string) (*chainhash.Hash, error) {
+	return c.SendManyTokenAsync(fromAccount, amounts, token).Receive()
+}
+
 // SendManyMinConfAsync returns an instance of a type that can be used to get
 // the result of the RPC at some future time by invoking the Receive function on
 // the returned instance.
 //
 // See SendManyMinConf for the blocking version and more details.
 func (c *Client) SendManyMinConfAsync(fromAccount string,
-	amounts map[util.Address]util.Amount,
+	amounts map[util.Address]util.Amount, token string,
 	minConfirms int) FutureSendManyResult {
 
 	convertedAmounts := make(map[string]float64, len(amounts))
@@ -691,7 +729,7 @@ func (c *Client) SendManyMinConfAsync(fromAccount string,
 		convertedAmounts[addr.EncodeAddress()] = amount.ToBTC()
 	}
 	cmd := btcjson.NewSendManyCmd(fromAccount, convertedAmounts,
-		&minConfirms, nil)
+		&token, &minConfirms, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -705,10 +743,10 @@ func (c *Client) SendManyMinConfAsync(fromAccount string,
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
 func (c *Client) SendManyMinConf(fromAccount string,
-	amounts map[util.Address]util.Amount,
+	amounts map[util.Address]util.Amount, token string,
 	minConfirms int) (*chainhash.Hash, error) {
 
-	return c.SendManyMinConfAsync(fromAccount, amounts, minConfirms).Receive()
+	return c.SendManyMinConfAsync(fromAccount, amounts, token, minConfirms).Receive()
 }
 
 // SendManyCommentAsync returns an instance of a type that can be used to get
@@ -717,7 +755,7 @@ func (c *Client) SendManyMinConf(fromAccount string,
 //
 // See SendManyComment for the blocking version and more details.
 func (c *Client) SendManyCommentAsync(fromAccount string,
-	amounts map[util.Address]util.Amount, minConfirms int,
+	amounts map[util.Address]util.Amount, token string, minConfirms int,
 	comment string) FutureSendManyResult {
 
 	convertedAmounts := make(map[string]float64, len(amounts))
@@ -725,7 +763,7 @@ func (c *Client) SendManyCommentAsync(fromAccount string,
 		convertedAmounts[addr.EncodeAddress()] = amount.ToBTC()
 	}
 	cmd := btcjson.NewSendManyCmd(fromAccount, convertedAmounts,
-		&minConfirms, &comment)
+		&token, &minConfirms, &comment)
 	return c.sendCmd(cmd)
 }
 
@@ -740,10 +778,10 @@ func (c *Client) SendManyCommentAsync(fromAccount string,
 // NOTE: This function requires to the wallet to be unlocked.  See the
 // WalletPassphrase function for more details.
 func (c *Client) SendManyComment(fromAccount string,
-	amounts map[util.Address]util.Amount, minConfirms int,
+	amounts map[util.Address]util.Amount, token string, minConfirms int,
 	comment string) (*chainhash.Hash, error) {
 
-	return c.SendManyCommentAsync(fromAccount, amounts, minConfirms,
+	return c.SendManyCommentAsync(fromAccount, amounts, token, minConfirms,
 		comment).Receive()
 }
 
@@ -1470,8 +1508,8 @@ func (r FutureGetBalanceParseResult) Receive() (util.Amount, error) {
 // returned instance.
 //
 // See GetBalance for the blocking version and more details.
-func (c *Client) GetBalanceAsync(account string) FutureGetBalanceResult {
-	cmd := btcjson.NewGetBalanceCmd(&account, nil)
+func (c *Client) GetBalanceAsync(token string, account string) FutureGetBalanceResult {
+	cmd := btcjson.NewGetBalanceCmd(&token, &account, nil)
 	return c.sendCmd(cmd)
 }
 
@@ -1480,8 +1518,8 @@ func (c *Client) GetBalanceAsync(account string) FutureGetBalanceResult {
 // be "*" for all accounts.
 //
 // See GetBalanceMinConf to override the minimum number of confirmations.
-func (c *Client) GetBalance(account string) (util.Amount, error) {
-	return c.GetBalanceAsync(account).Receive()
+func (c *Client) GetBalance(token string, account string) (util.Amount, error) {
+	return c.GetBalanceAsync(token, account).Receive()
 }
 
 // GetBalanceMinConfAsync returns an instance of a type that can be used to get
@@ -1489,8 +1527,8 @@ func (c *Client) GetBalance(account string) (util.Amount, error) {
 // the returned instance.
 //
 // See GetBalanceMinConf for the blocking version and more details.
-func (c *Client) GetBalanceMinConfAsync(account string, minConfirms int) FutureGetBalanceResult {
-	cmd := btcjson.NewGetBalanceCmd(&account, &minConfirms)
+func (c *Client) GetBalanceMinConfAsync(token string, account string, minConfirms int) FutureGetBalanceResult {
+	cmd := btcjson.NewGetBalanceCmd(&token, &account, &minConfirms)
 	return c.sendCmd(cmd)
 }
 
@@ -1499,12 +1537,12 @@ func (c *Client) GetBalanceMinConfAsync(account string, minConfirms int) FutureG
 // account may be "*" for all accounts.
 //
 // See GetBalance to use the default minimum number of confirmations.
-func (c *Client) GetBalanceMinConf(account string, minConfirms int) (util.Amount, error) {
+func (c *Client) GetBalanceMinConf(token string, account string, minConfirms int) (util.Amount, error) {
 	if c.config.EnableBCInfoHacks {
-		response := c.GetBalanceMinConfAsync(account, minConfirms)
+		response := c.GetBalanceMinConfAsync(token, account, minConfirms)
 		return FutureGetBalanceParseResult(response).Receive()
 	}
-	return c.GetBalanceMinConfAsync(account, minConfirms).Receive()
+	return c.GetBalanceMinConfAsync(token, account, minConfirms).Receive()
 }
 
 // FutureGetReceivedByAccountResult is a future promise to deliver the result of

@@ -36,6 +36,8 @@ const (
 	InvTypeWitnessBlock         InvType = InvTypeBlock | InvWitnessFlag
 	InvTypeWitnessTx            InvType = InvTypeTx | InvWitnessFlag
 	InvTypeFilteredWitnessBlock InvType = InvTypeFilteredBlock | InvWitnessFlag
+	InvTypeOdr                  InvType = 4
+	InvTypeWitnessOdr           InvType = InvTypeOdr | InvWitnessFlag
 )
 
 // Map of service flags back to their constant names for pretty printing.
@@ -47,6 +49,8 @@ var ivStrings = map[InvType]string{
 	InvTypeWitnessBlock:         "MSG_WITNESS_BLOCK",
 	InvTypeWitnessTx:            "MSG_WITNESS_TX",
 	InvTypeFilteredWitnessBlock: "MSG_FILTERED_WITNESS_BLOCK",
+	InvTypeOdr:                  "MSG_ODR",
+	InvTypeWitnessOdr:           "MSG_WITNESS_ODR",
 }
 
 // String returns the InvType in human-readable form.

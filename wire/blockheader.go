@@ -9,13 +9,16 @@ import (
 	"io"
 	"time"
 
+	"github.com/endurio/ndrd/btcec"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 )
 
 // MaxBlockHeaderPayload is the maximum number of bytes a block header can be.
 // Version 4 bytes + Timestamp 4 bytes + Bits 4 bytes + Nonce 4 bytes +
+// PriceDerivation 8 bytes +
+// Miner's Signature +
 // PrevBlock and MerkleRoot hashes.
-const MaxBlockHeaderPayload = 16 + (chainhash.HashSize * 2)
+var MaxBlockHeaderPayload = 16 + 8 + (chainhash.HashSize * 2) + btcec.CompactSignatureSize
 
 // BlockHeader defines information about a block and is used in the bitcoin
 // block (MsgBlock) and headers (MsgHeaders) messages.
@@ -38,11 +41,21 @@ type BlockHeader struct {
 
 	// Nonce used to generate the block.
 	Nonce uint32
+
+	// Price derivation of STB/USD from 1.0.
+	// For market price of STB/USD is 1.0 + x, PriceDerivation = x is fed.
+	// math.NaN() is fed for no value provided.
+	PriceDerivation float64
+
+	// Miner's signature for all data above in compact format.
+	// PK recovered from this must be the same with coinbase address,
+	// otherwise, the coinbase tx cannot be spent.
+	Signature btcec.CompactSignature
 }
 
 // blockHeaderLen is a constant that represents the number of bytes for a block
 // header.
-const blockHeaderLen = 80
+var blockHeaderLen = MaxBlockHeaderPayload
 
 // BlockHash computes the block identifier hash for the given block header.
 func (h *BlockHeader) BlockHash() chainhash.Hash {
@@ -54,6 +67,32 @@ func (h *BlockHeader) BlockHash() chainhash.Hash {
 	_ = writeBlockHeader(buf, 0, h)
 
 	return chainhash.DoubleHashH(buf.Bytes())
+}
+
+// BlockHashWithoutSignature does BlockHash without signature.
+func (h *BlockHeader) BlockHashWithoutSignature() []byte {
+	// Encode the header and double sha256 everything prior to the number of
+	// transactions.  Ignore the error returns since there is no way the
+	// encode could fail except being out of memory which would cause a
+	// run-time panic.
+	buf := bytes.NewBuffer(make([]byte, 0, MaxBlockHeaderPayload-btcec.CompactSignatureSize))
+	_ = writeBlockHeaderWithoutSignature(buf, 0, h)
+
+	return chainhash.DoubleHashB(buf.Bytes())
+}
+
+// Sign signs the header data (except the signature itself)
+func (h *BlockHeader) Sign(key *btcec.PrivateKey) (*btcec.CompactSignature, error) {
+	hash := h.BlockHashWithoutSignature()
+
+	sigbytes, err := btcec.SignCompact(btcec.S256(), key, hash, true)
+	if err != nil {
+		return nil, err
+	}
+
+	copy(h.Signature[:], sigbytes)
+
+	return &h.Signature, nil
 }
 
 // BtcDecode decodes r using the bitcoin protocol encoding into the receiver.
@@ -96,17 +135,19 @@ func (h *BlockHeader) Serialize(w io.Writer) error {
 // block hash, merkle root hash, difficulty bits, and nonce used to generate the
 // block with defaults for the remaining fields.
 func NewBlockHeader(version int32, prevHash, merkleRootHash *chainhash.Hash,
-	bits uint32, nonce uint32) *BlockHeader {
+	bits uint32, nonce uint32, priceDerivation float64, signature *btcec.CompactSignature) *BlockHeader {
 
 	// Limit the timestamp to one second precision since the protocol
 	// doesn't support better.
 	return &BlockHeader{
-		Version:    version,
-		PrevBlock:  *prevHash,
-		MerkleRoot: *merkleRootHash,
-		Timestamp:  time.Unix(time.Now().Unix(), 0),
-		Bits:       bits,
-		Nonce:      nonce,
+		Version:         version,
+		PrevBlock:       *prevHash,
+		MerkleRoot:      *merkleRootHash,
+		Timestamp:       time.Unix(time.Now().Unix(), 0),
+		Bits:            bits,
+		Nonce:           nonce,
+		PriceDerivation: priceDerivation,
+		Signature:       *signature,
 	}
 }
 
@@ -115,7 +156,7 @@ func NewBlockHeader(version int32, prevHash, merkleRootHash *chainhash.Hash,
 // decoding from the wire.
 func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
 	return readElements(r, &bh.Version, &bh.PrevBlock, &bh.MerkleRoot,
-		(*uint32Time)(&bh.Timestamp), &bh.Bits, &bh.Nonce)
+		(*uint32Time)(&bh.Timestamp), &bh.Bits, &bh.Nonce, &bh.PriceDerivation, &bh.Signature)
 }
 
 // writeBlockHeader writes a bitcoin block header to w.  See Serialize for
@@ -124,5 +165,13 @@ func readBlockHeader(r io.Reader, pver uint32, bh *BlockHeader) error {
 func writeBlockHeader(w io.Writer, pver uint32, bh *BlockHeader) error {
 	sec := uint32(bh.Timestamp.Unix())
 	return writeElements(w, bh.Version, &bh.PrevBlock, &bh.MerkleRoot,
-		sec, bh.Bits, bh.Nonce)
+		sec, bh.Bits, bh.Nonce, bh.PriceDerivation, &bh.Signature)
+}
+
+// writeBlockHeaderWithoutSignature does writeBlockHeader but without the
+// signature
+func writeBlockHeaderWithoutSignature(w io.Writer, pver uint32, bh *BlockHeader) error {
+	sec := uint32(bh.Timestamp.Unix())
+	return writeElements(w, bh.Version, &bh.PrevBlock, &bh.MerkleRoot,
+		sec, bh.Bits, bh.Nonce, bh.PriceDerivation)
 }

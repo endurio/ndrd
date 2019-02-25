@@ -220,6 +220,18 @@ const (
 	// current chain tip. This is not a block validation rule, but is required
 	// for block proposals submitted via getblocktemplate RPC.
 	ErrPrevBlockNotBest
+
+	// ErrBadSignature indicates the included signature is invalid.
+	ErrBadSignature
+
+	// ErrUnauthorizedMiner indicates the miner public key is not authorized.
+	ErrUnauthorizedMiner
+
+	// ErrNotAnOrder indicates the object is actually not and order.
+	ErrNotAnOrder
+
+	// ErrBadAbsorption indicates an invalid absorption orders in a block.
+	ErrBadAbsorption
 )
 
 // Map of ErrorCode values back to their constant names for pretty printing.

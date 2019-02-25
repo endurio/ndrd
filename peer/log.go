@@ -99,6 +99,10 @@ func invSummary(invList []*wire.InvVect) string {
 			return fmt.Sprintf("witness tx %s", iv.Hash)
 		case wire.InvTypeTx:
 			return fmt.Sprintf("tx %s", iv.Hash)
+		case wire.InvTypeWitnessOdr:
+			return fmt.Sprintf("witness order %s", iv.Hash)
+		case wire.InvTypeOdr:
+			return fmt.Sprintf("order %s", iv.Hash)
 		}
 
 		return fmt.Sprintf("unknown (%d) %s", uint32(iv.Type), iv.Hash)
@@ -216,7 +220,7 @@ func messageSummary(msg wire.Message) string {
 		rejReason := sanitizeString(msg.Reason, maxRejectReasonLen)
 		summary := fmt.Sprintf("cmd %v, code %v, reason %v", rejCommand,
 			msg.Code, rejReason)
-		if rejCommand == wire.CmdBlock || rejCommand == wire.CmdTx {
+		if rejCommand == wire.CmdBlock || rejCommand == wire.CmdTx || rejCommand == wire.CmdOdr {
 			summary += fmt.Sprintf(", hash %v", msg.Hash)
 		}
 		return summary

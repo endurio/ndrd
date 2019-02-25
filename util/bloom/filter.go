@@ -342,6 +342,84 @@ func (bf *Filter) MatchTxAndUpdate(tx *util.Tx) bool {
 	return match
 }
 
+// matchOdrAndUpdate returns true if the bloom filter matches data within the
+// passed order, otherwise false is returned.  If the filter does match
+// the passed order, it will also update the filter depending on the bloom
+// update flags set via the loaded filter if needed.
+//
+// This function MUST be called with the filter lock held.
+func (bf *Filter) matchOdrAndUpdate(odr *util.Odr) bool {
+	// Check if the filter matches the hash of the order.
+	// This is useful for finding orders when they appear in a block.
+	matched := bf.matches(odr.Hash()[:])
+
+	// Check if the filter matches any data elements in the public key
+	// scripts of any of the outputs.  When it does, add the outpoint that
+	// matched so orders which spend from the matched order are
+	// also included in the filter.  This removes the burden of updating the
+	// filter for this scenario from the client.  It is also more efficient
+	// on the network since it avoids the need for another filteradd message
+	// from the client and avoids some potential races that could otherwise
+	// occur.
+	for i, txOut := range odr.TxOut {
+		pushedData, err := txscript.PushedData(txOut.PkScript)
+		if err != nil {
+			continue
+		}
+
+		for _, data := range pushedData {
+			if !bf.matches(data) {
+				continue
+			}
+
+			matched = true
+			bf.maybeAddOutpoint(txOut.PkScript, odr.Hash(), uint32(i))
+			break
+		}
+	}
+
+	// Nothing more to do if a match has already been made.
+	if matched {
+		return true
+	}
+
+	// At this point, the order and none of the data elements in the
+	// public key scripts of its outputs matched.
+
+	// Check if the filter matches any outpoints this order spends or
+	// any any data elements in the signature scripts of any of the inputs.
+	for _, odrin := range odr.TxIn {
+		if bf.matchesOutPoint(&odrin.PreviousOutPoint) {
+			return true
+		}
+
+		pushedData, err := txscript.PushedData(odrin.SignatureScript)
+		if err != nil {
+			continue
+		}
+		for _, data := range pushedData {
+			if bf.matches(data) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// MatchOdrAndUpdate returns true if the bloom filter matches data within the
+// passed order, otherwise false is returned.  If the filter does match
+// the passed order, it will also update the filter depending on the bloom
+// update flags set via the loaded filter if needed.
+//
+// This function is safe for concurrent access.
+func (bf *Filter) MatchOdrAndUpdate(odr *util.Odr) bool {
+	bf.mtx.Lock()
+	match := bf.matchOdrAndUpdate(odr)
+	bf.mtx.Unlock()
+	return match
+}
+
 // MsgFilterLoad returns the underlying wire.MsgFilterLoad for the bloom
 // filter.
 //

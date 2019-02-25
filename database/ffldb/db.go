@@ -32,17 +32,19 @@ const (
 	// metadataDbName is the name used for the metadata database.
 	metadataDbName = "metadata"
 
-	// blockHdrSize is the size of a block header.  This is simply the
-	// constant from wire and is only provided here for convenience since
-	// wire.MaxBlockHeaderPayload is quite long.
-	blockHdrSize = wire.MaxBlockHeaderPayload
-
 	// blockHdrOffset defines the offsets into a block index row for the
 	// block header.
 	//
 	// The serialized block index row format is:
 	//   <blocklocation><blockheader>
 	blockHdrOffset = blockLocSize
+)
+
+var (
+	// blockHdrSize is the size of a block header.  This is simply the
+	// constant from wire and is only provided here for convenience since
+	// wire.MaxBlockHeaderPayload is quite long.
+	blockHdrSize = uint32(wire.MaxBlockHeaderPayload)
 )
 
 var (

@@ -8,16 +8,16 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"runtime"
 	"sync"
 	"time"
 
 	"github.com/endurio/ndrd/blockchain"
+	"github.com/endurio/ndrd/btcec"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/mining"
-	"github.com/endurio/ndrd/wire"
 	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/wire"
 )
 
 const (
@@ -41,10 +41,8 @@ const (
 )
 
 var (
-	// defaultNumWorkers is the default number of workers to use for mining
-	// and is based on the number of processor cores.  This helps ensure the
-	// system stays reasonably responsive under heavy load.
-	defaultNumWorkers = uint32(runtime.NumCPU())
+	// defaultNumWorkers is always 1 for MVP
+	defaultNumWorkers = uint32(1)
 )
 
 // Config is a descriptor containing the cpu miner configuration.
@@ -57,9 +55,8 @@ type Config struct {
 	// generate block templates that the miner will attempt to solve.
 	BlockTemplateGenerator *mining.BlkTmplGenerator
 
-	// MiningAddrs is a list of payment addresses to use for the generated
-	// blocks.  Each generated block will randomly choose one of them.
-	MiningAddrs []util.Address
+	// MiningKey is the private key to use for the generated blocks.
+	MiningKey *btcec.PrivateKey
 
 	// ProcessBlock defines the function to call with any solved blocks.
 	// It typically must run the provided block through the same set of
@@ -81,6 +78,9 @@ type Config struct {
 	// not current since any solved blocks would be on a side chain and and
 	// up orphaned anyways.
 	IsCurrent func() bool
+
+	// SingleNode allows mainnet and testnet to run in with only 1 node.
+	SingleNode bool
 }
 
 // CPUMiner provides facilities for solving blocks (mining) using the CPU in
@@ -218,7 +218,17 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 
 	// Create some convenience variables.
 	header := &msgBlock.Header
-	targetDifficulty := blockchain.CompactToBig(header.Bits)
+
+	// instant generation when generate is supported (simnet and regnet)
+	if m.cfg.ChainParams.GenerateSupported {
+		header.Nonce = uint32(enOffset)
+		header.Sign(m.cfg.MiningKey)
+		return true
+	}
+
+	// seed the pseudo random
+	rand.Seed(time.Now().UnixNano())
+	targetBlockTime := int64(m.cfg.ChainParams.TargetTimePerBlock)
 
 	// Initial state.
 	lastGenerated := time.Now()
@@ -274,13 +284,17 @@ func (m *CPUMiner) solveBlock(msgBlock *wire.MsgBlock, blockHeight int32,
 			// increment the number of hashes completed for each
 			// attempt accordingly.
 			header.Nonce = i
-			hash := header.BlockHash()
+
+			// Randomly sleep and check
+			dividend := rand.Int63n(13) + 6
+			delay := targetBlockTime / dividend
+			time.Sleep(time.Duration(delay))
 			hashesCompleted += 2
 
-			// The block is solved when the new block hash is less
-			// than the target difficulty.  Yay!
-			if blockchain.HashToBig(&hash).Cmp(targetDifficulty) <= 0 {
+			// Yay!
+			if rand.Int63n(dividend) == 0 {
 				m.updateHashes <- hashesCompleted
+				header.Sign(m.cfg.MiningKey)
 				return true
 			}
 		}
@@ -316,7 +330,8 @@ out:
 		// Wait until there is a connection to at least one other peer
 		// since there is no way to relay a found block or receive
 		// transactions to work on when there are no connected peers.
-		if m.cfg.ConnectedCount() == 0 {
+		// Unless we are in single node mode
+		if !m.cfg.SingleNode && m.cfg.ConnectedCount() == 0 {
 			time.Sleep(time.Second)
 			continue
 		}
@@ -334,9 +349,7 @@ out:
 			continue
 		}
 
-		// Choose a payment address at random.
-		rand.Seed(time.Now().UnixNano())
-		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
+		payToAddr := mining.Address(m.cfg.MiningKey, m.cfg.ChainParams)
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially
@@ -588,9 +601,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		m.submitBlockLock.Lock()
 		curHeight := m.g.BestSnapshot().Height
 
-		// Choose a payment address at random.
-		rand.Seed(time.Now().UnixNano())
-		payToAddr := m.cfg.MiningAddrs[rand.Intn(len(m.cfg.MiningAddrs))]
+		payToAddr := mining.Address(m.cfg.MiningKey, m.cfg.ChainParams)
 
 		// Create a new block template using the available transactions
 		// in the memory pool as a source of transactions to potentially

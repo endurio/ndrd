@@ -8,6 +8,8 @@ package blockchain
 import (
 	"container/list"
 	"fmt"
+	"math"
+	"math/big"
 	"sync"
 	"time"
 
@@ -15,8 +17,8 @@ import (
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/database"
 	"github.com/endurio/ndrd/txscript"
-	"github.com/endurio/ndrd/wire"
 	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/wire"
 )
 
 const (
@@ -67,11 +69,12 @@ type BestState struct {
 	NumTxns     uint64         // The number of txns in the block.
 	TotalTxns   uint64         // The total number of txns in the chain.
 	MedianTime  time.Time      // Median time as per CalcPastMedianTime.
+
+	TotalSupply big.Int // The total supply of STB in the chain.
 }
 
 // newBestState returns a new best stats instance for the given parameters.
-func newBestState(node *blockNode, blockSize, blockWeight, numTxns,
-	totalTxns uint64, medianTime time.Time) *BestState {
+func newBestState(node *blockNode, blockSize, blockWeight, numTxns, totalTxns uint64, medianTime time.Time, totalSupply *big.Int) *BestState {
 
 	return &BestState{
 		Hash:        node.hash,
@@ -82,6 +85,8 @@ func newBestState(node *blockNode, blockSize, blockWeight, numTxns,
 		NumTxns:     numTxns,
 		TotalTxns:   totalTxns,
 		MedianTime:  medianTime,
+
+		TotalSupply: *totalSupply,
 	}
 }
 
@@ -600,12 +605,26 @@ func (b *BlockChain) connectBlock(node *blockNode, block *util.Block,
 	// database and later memory if all database updates are successful.
 	b.stateLock.RLock()
 	curTotalTxns := b.stateSnapshot.TotalTxns
+	totalSupply := b.stateSnapshot.TotalSupply
 	b.stateLock.RUnlock()
 	numTxns := uint64(len(block.MsgBlock().Transactions))
 	blockSize := uint64(block.MsgBlock().SerializeSize())
 	blockWeight := uint64(GetBlockWeight(block))
+	totalSupply.Add(&totalSupply, node.supplyChange)
+
+	// check if a new absorption should occur in this block
+	rate, err := b.checkNewAbsorptionRate(node)
+	if err != nil {
+		return err
+	}
+	if !math.IsNaN(rate) {
+		// triggered, update the last absorption data
+		b.index.SetStatusFlags(node, statusAbsorption)
+	}
+
 	state := newBestState(node, blockSize, blockWeight, numTxns,
-		curTotalTxns+numTxns, node.CalcPastMedianTime())
+		curTotalTxns+numTxns, node.CalcPastMedianTime(),
+		&totalSupply)
 
 	// Atomically insert info into the database.
 	err = b.db.Update(func(dbTx database.Tx) error {
@@ -712,13 +731,17 @@ func (b *BlockChain) disconnectBlock(node *blockNode, block *util.Block, view *U
 	// database and later memory if all database updates are successful.
 	b.stateLock.RLock()
 	curTotalTxns := b.stateSnapshot.TotalTxns
+	totalSupply := b.stateSnapshot.TotalSupply
 	b.stateLock.RUnlock()
 	numTxns := uint64(len(prevBlock.MsgBlock().Transactions))
 	blockSize := uint64(prevBlock.MsgBlock().SerializeSize())
 	blockWeight := uint64(GetBlockWeight(prevBlock))
 	newTotalTxns := curTotalTxns - uint64(len(block.MsgBlock().Transactions))
+	totalSupply.Sub(&totalSupply, node.supplyChange)
+	// TODO: calculate whether absorption occurs in this block
 	state := newBestState(prevNode, blockSize, blockWeight, numTxns,
-		newTotalTxns, prevNode.CalcPastMedianTime())
+		newTotalTxns, prevNode.CalcPastMedianTime(),
+		&totalSupply)
 
 	err = b.db.Update(func(dbTx database.Tx) error {
 		// Update best block state.
@@ -867,6 +890,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 	// and remove the utxos created by the blocks.
 	view := NewUtxoViewpoint()
 	view.SetBestHash(&oldBest.hash)
+
 	for e := detachNodes.Front(); e != nil; e = e.Next() {
 		n := e.Value.(*blockNode)
 		var block *util.Block
@@ -957,7 +981,7 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 			if err != nil {
 				return err
 			}
-			err = view.connectTransactions(block, nil)
+			_, err = view.connectTransactions(block, nil)
 			if err != nil {
 				return err
 			}
@@ -1042,10 +1066,12 @@ func (b *BlockChain) reorganizeChain(detachNodes, attachNodes *list.List) error 
 		// to it.  Also, provide an stxo slice so the spent txout
 		// details are generated.
 		stxos := make([]SpentTxOut, 0, countSpentOutputs(block))
-		err = view.connectTransactions(block, &stxos)
+		supplyChange, err := view.connectTransactions(block, &stxos)
 		if err != nil {
 			return err
 		}
+
+		b.index.SetSupplyChange(n, supplyChange)
 
 		// Update the database and chain state.
 		err = b.connectBlock(n, block, view, stxos)
@@ -1135,10 +1161,11 @@ func (b *BlockChain) connectBestChain(node *blockNode, block *util.Block, flags 
 			if err != nil {
 				return false, err
 			}
-			err = view.connectTransactions(block, &stxos)
+			supplyChange, err := view.connectTransactions(block, &stxos)
 			if err != nil {
 				return false, err
 			}
+			b.index.SetSupplyChange(node, supplyChange)
 		}
 
 		// Connect the block to the main chain.
@@ -1685,6 +1712,9 @@ type Config struct {
 	// and add time samples from other peers on the network so the local
 	// time is adjusted to be in agreement with other peers.
 	TimeSource MedianTimeSource
+
+	// PriceSource defines the price source fed from outside of the network.
+	PriceSource FeedPriceSource
 
 	// SigCache defines a signature cache to use when when validating
 	// signatures.  This is typically most useful when individual

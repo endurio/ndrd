@@ -12,18 +12,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/database"
-	"github.com/endurio/ndrd/wire"
 	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/wire"
 )
 
 const (
-	// blockHdrSize is the size of a block header.  This is simply the
-	// constant from wire and is only provided here for convenience since
-	// wire.MaxBlockHeaderPayload is quite long.
-	blockHdrSize = wire.MaxBlockHeaderPayload
-
 	// latestUtxoSetBucketVersion is the current version of the utxo set
 	// bucket that is used to track all unspent outputs.
 	latestUtxoSetBucketVersion = 2
@@ -32,6 +28,13 @@ const (
 	// journal bucket that is used to track all spent transactions for use
 	// in reorgs.
 	latestSpendJournalBucketVersion = 1
+)
+
+var (
+	// blockHdrSize is the size of a block header.  This is simply the
+	// constant from wire and is only provided here for convenience since
+	// wire.MaxBlockHeaderPayload is quite long.
+	blockHdrSize = wire.MaxBlockHeaderPayload
 )
 
 var (
@@ -251,6 +254,11 @@ type SpentTxOut struct {
 
 	// Denotes if the creating tx is a coinbase.
 	IsCoinBase bool
+}
+
+// TokenID returns the identity of the token for the output
+func (stxo *SpentTxOut) TokenID() wire.TokenIdentity {
+	return wire.TokenID(stxo.PkScript)
 }
 
 // FetchSpendJournal attempts to retrieve the spend journal, or the set of
@@ -922,6 +930,8 @@ type bestChainState struct {
 	height    uint32
 	totalTxns uint64
 	workSum   *big.Int
+
+	totalSupply *big.Int
 }
 
 // serializeBestChainState returns the serialization of the passed block best
@@ -930,7 +940,10 @@ func serializeBestChainState(state bestChainState) []byte {
 	// Calculate the full size needed to serialize the chain state.
 	workSumBytes := state.workSum.Bytes()
 	workSumBytesLen := uint32(len(workSumBytes))
-	serializedLen := chainhash.HashSize + 4 + 8 + 4 + workSumBytesLen
+	totalSupplyBytes := state.totalSupply.Bytes()
+	totalSupplyBytesLen := uint32(len(totalSupplyBytes))
+	serializedLen := chainhash.HashSize + 4 + 8 + 4 + 4 +
+		workSumBytesLen + totalSupplyBytesLen
 
 	// Serialize the chain state.
 	serializedData := make([]byte, serializedLen)
@@ -940,9 +953,17 @@ func serializeBestChainState(state bestChainState) []byte {
 	offset += 4
 	byteOrder.PutUint64(serializedData[offset:], state.totalTxns)
 	offset += 8
+
 	byteOrder.PutUint32(serializedData[offset:], workSumBytesLen)
 	offset += 4
 	copy(serializedData[offset:], workSumBytes)
+	offset += workSumBytesLen
+
+	byteOrder.PutUint32(serializedData[offset:], totalSupplyBytesLen)
+	offset += 4
+	copy(serializedData[offset:], totalSupplyBytes)
+	offset += totalSupplyBytesLen
+
 	return serializedData[:]
 }
 
@@ -953,7 +974,7 @@ func serializeBestChainState(state bestChainState) []byte {
 func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 	// Ensure the serialized data has enough bytes to properly deserialize
 	// the hash, height, total transactions, and work sum length.
-	if len(serializedData) < chainhash.HashSize+16 {
+	if len(serializedData) < chainhash.HashSize+4+8+4+4 {
 		return bestChainState{}, database.Error{
 			ErrorCode:   database.ErrCorruption,
 			Description: "corrupt best chain state",
@@ -967,9 +988,9 @@ func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 	offset += 4
 	state.totalTxns = byteOrder.Uint64(serializedData[offset : offset+8])
 	offset += 8
+
 	workSumBytesLen := byteOrder.Uint32(serializedData[offset : offset+4])
 	offset += 4
-
 	// Ensure the serialized data has enough bytes to deserialize the work
 	// sum.
 	if uint32(len(serializedData[offset:])) < workSumBytesLen {
@@ -979,7 +1000,29 @@ func deserializeBestChainState(serializedData []byte) (bestChainState, error) {
 		}
 	}
 	workSumBytes := serializedData[offset : offset+workSumBytesLen]
+	offset += workSumBytesLen
 	state.workSum = new(big.Int).SetBytes(workSumBytes)
+
+	// Ensure the serialized data has enough bytes to deserialize the len.
+	if uint32(len(serializedData[offset:])) < 4 {
+		return bestChainState{}, database.Error{
+			ErrorCode:   database.ErrCorruption,
+			Description: "corrupt best chain state",
+		}
+	}
+	totalSupplyBytesLen := byteOrder.Uint32(serializedData[offset : offset+4])
+	offset += 4
+	// Ensure the serialized data has enough bytes to deserialize the total
+	// supply.
+	if uint32(len(serializedData[offset:])) < totalSupplyBytesLen {
+		return bestChainState{}, database.Error{
+			ErrorCode:   database.ErrCorruption,
+			Description: "corrupt best chain state",
+		}
+	}
+	totalSupplyBytes := serializedData[offset : offset+totalSupplyBytesLen]
+	offset += totalSupplyBytesLen
+	state.totalSupply = new(big.Int).SetBytes(totalSupplyBytes)
 
 	return state, nil
 }
@@ -993,6 +1036,8 @@ func dbPutBestState(dbTx database.Tx, snapshot *BestState, workSum *big.Int) err
 		height:    uint32(snapshot.Height),
 		totalTxns: snapshot.TotalTxns,
 		workSum:   workSum,
+
+		totalSupply: &snapshot.TotalSupply,
 	})
 
 	// Store the current best chain state into the database.
@@ -1009,6 +1054,7 @@ func (b *BlockChain) createChainState() error {
 	header := &genesisBlock.MsgBlock().Header
 	node := newBlockNode(header, nil)
 	node.status = statusDataStored | statusValid
+	node.supplyChange = &BigZero
 	b.bestChain.SetTip(node)
 
 	// Add the new node to the index which is used for faster lookups.
@@ -1020,7 +1066,8 @@ func (b *BlockChain) createChainState() error {
 	blockSize := uint64(genesisBlock.MsgBlock().SerializeSize())
 	blockWeight := uint64(GetBlockWeight(genesisBlock))
 	b.stateSnapshot = newBestState(node, blockSize, blockWeight, numTxns,
-		numTxns, time.Unix(node.timestamp, 0))
+		numTxns, time.Unix(node.timestamp, 0),
+		big.NewInt(chaincfg.PreminedSTB))
 
 	// Create the initial the database chain state including creating the
 	// necessary index buckets and inserting the genesis block.
@@ -1082,6 +1129,19 @@ func (b *BlockChain) createChainState() error {
 		// Add the genesis block hash to height and height to hash
 		// mappings to the index.
 		err = dbPutBlockIndex(dbTx, &node.hash, node.height)
+		if err != nil {
+			return err
+		}
+
+		// Connect all coinbase txs of genesis block which is premined
+		view := NewUtxoViewpoint()
+		_, err = view.connectTransactions(genesisBlock, nil)
+		if err != nil {
+			return err
+		}
+
+		// Update the utxo set with premined coins
+		err = dbPutUtxoView(dbTx, view)
 		if err != nil {
 			return err
 		}
@@ -1162,7 +1222,7 @@ func (b *BlockChain) initChainState() error {
 		var lastNode *blockNode
 		cursor = blockIndexBucket.Cursor()
 		for ok := cursor.First(); ok; ok = cursor.Next() {
-			header, status, err := deserializeBlockRow(cursor.Value())
+			header, status, supplyChange, err := deserializeBlockRow(cursor.Value())
 			if err != nil {
 				return err
 			}
@@ -1195,6 +1255,7 @@ func (b *BlockChain) initChainState() error {
 			// and add it to the block index.
 			node := &blockNodes[i]
 			initBlockNode(node, header, parent)
+			node.supplyChange = supplyChange
 			node.status = status
 			b.index.addNode(node)
 
@@ -1245,7 +1306,8 @@ func (b *BlockChain) initChainState() error {
 		blockWeight := uint64(GetBlockWeight(util.NewBlock(&block)))
 		numTxns := uint64(len(block.Transactions))
 		b.stateSnapshot = newBestState(tip, blockSize, blockWeight,
-			numTxns, state.totalTxns, tip.CalcPastMedianTime())
+			numTxns, state.totalTxns, tip.CalcPastMedianTime(),
+			state.totalSupply)
 
 		return nil
 	})
@@ -1261,21 +1323,25 @@ func (b *BlockChain) initChainState() error {
 
 // deserializeBlockRow parses a value in the block index bucket into a block
 // header and block status bitfield.
-func deserializeBlockRow(blockRow []byte) (*wire.BlockHeader, blockStatus, error) {
+func deserializeBlockRow(blockRow []byte) (*wire.BlockHeader, blockStatus, *big.Int, error) {
 	buffer := bytes.NewReader(blockRow)
 
 	var header wire.BlockHeader
 	err := header.Deserialize(buffer)
 	if err != nil {
-		return nil, statusNone, err
+		return nil, statusNone, nil, err
 	}
 
 	statusByte, err := buffer.ReadByte()
 	if err != nil {
-		return nil, statusNone, err
+		return nil, statusNone, nil, err
 	}
 
-	return &header, blockStatus(statusByte), nil
+	supplyChangeBytes, err := wire.ReadVarBytes(buffer, 0, 64, "supplyChange")
+	if err != nil {
+		return nil, statusNone, nil, err
+	}
+	return &header, blockStatus(statusByte), new(big.Int).SetBytes(supplyChangeBytes), nil
 }
 
 // dbFetchHeaderByHash uses an existing database transaction to retrieve the
@@ -1330,7 +1396,13 @@ func dbFetchBlockByNode(dbTx database.Tx, node *blockNode) (*util.Block, error) 
 // index bucket. This overwrites the current entry if there exists one.
 func dbStoreBlockNode(dbTx database.Tx, node *blockNode) error {
 	// Serialize block data to be stored.
-	w := bytes.NewBuffer(make([]byte, 0, blockHdrSize+1))
+	dataLen := blockHdrSize + 1
+
+	supplyChangeBytes := node.supplyChange.Bytes()
+	len := len(supplyChangeBytes)
+	dataLen += wire.VarIntSerializeSize(uint64(len)) + len
+
+	w := bytes.NewBuffer(make([]byte, 0, dataLen))
 	header := node.Header()
 	err := header.Serialize(w)
 	if err != nil {
@@ -1340,6 +1412,12 @@ func dbStoreBlockNode(dbTx database.Tx, node *blockNode) error {
 	if err != nil {
 		return err
 	}
+
+	err = wire.WriteVarBytes(w, 0, supplyChangeBytes)
+	if err != nil {
+		return err
+	}
+
 	value := w.Bytes()
 
 	// Write block header data to block index bucket.

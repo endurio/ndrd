@@ -37,6 +37,12 @@ var (
 	oneInitializer = []byte{0x01}
 )
 
+// CompactSignatureSize is the fixed size of a compact signature
+const CompactSignatureSize = 65
+
+// CompactSignature is a compact signature
+type CompactSignature [CompactSignatureSize]byte
+
 // Serialize returns the ECDSA signature in the more strict DER format.  Note
 // that the serialized bytes returned do not include the appended hash type
 // used in Bitcoin signature scripts.

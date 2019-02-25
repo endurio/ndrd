@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/endurio/ndrd/btcec"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/database"
@@ -32,6 +33,8 @@ const (
 	// statusInvalidAncestor indicates that one of the block's ancestors has
 	// has failed validation, thus the block is also invalid.
 	statusInvalidAncestor
+
+	statusAbsorption
 
 	// statusNone indicates that the block has no validation state flags set.
 	//
@@ -58,6 +61,11 @@ func (status blockStatus) KnownValid() bool {
 // invalid yet.
 func (status blockStatus) KnownInvalid() bool {
 	return status&(statusValidateFailed|statusInvalidAncestor) != 0
+}
+
+// Absorption returns whether the block triggers an new absorption.
+func (status blockStatus) Absorption() bool {
+	return status&statusAbsorption != 0
 }
 
 // blockNode represents a block within the block chain and is primarily used to
@@ -94,6 +102,10 @@ type blockNode struct {
 	timestamp  int64
 	merkleRoot chainhash.Hash
 
+	priceDerivation Price
+	supplyChange    *big.Int // STB supply change in this block.
+	signature       btcec.CompactSignature
+
 	// status is a bitfield representing the validation state of the block. The
 	// status field, unlike the other fields, may be written to and so should
 	// only be accessed using the concurrent-safe NodeStatus method on
@@ -107,13 +119,16 @@ type blockNode struct {
 // initially creating a node.
 func initBlockNode(node *blockNode, blockHeader *wire.BlockHeader, parent *blockNode) {
 	*node = blockNode{
-		hash:       blockHeader.BlockHash(),
-		workSum:    CalcWork(blockHeader.Bits),
-		version:    blockHeader.Version,
-		bits:       blockHeader.Bits,
-		nonce:      blockHeader.Nonce,
-		timestamp:  blockHeader.Timestamp.Unix(),
-		merkleRoot: blockHeader.MerkleRoot,
+		hash:            blockHeader.BlockHash(),
+		workSum:         CalcWork(blockHeader.Bits),
+		version:         blockHeader.Version,
+		bits:            blockHeader.Bits,
+		nonce:           blockHeader.Nonce,
+		timestamp:       blockHeader.Timestamp.Unix(),
+		merkleRoot:      blockHeader.MerkleRoot,
+		priceDerivation: Price(blockHeader.PriceDerivation),
+		supplyChange:    &BigZero,
+		signature:       blockHeader.Signature,
 	}
 	if parent != nil {
 		node.parent = parent
@@ -141,12 +156,14 @@ func (node *blockNode) Header() wire.BlockHeader {
 		prevHash = &node.parent.hash
 	}
 	return wire.BlockHeader{
-		Version:    node.version,
-		PrevBlock:  *prevHash,
-		MerkleRoot: node.merkleRoot,
-		Timestamp:  time.Unix(node.timestamp, 0),
-		Bits:       node.bits,
-		Nonce:      node.nonce,
+		Version:         node.version,
+		PrevBlock:       *prevHash,
+		MerkleRoot:      node.merkleRoot,
+		Timestamp:       time.Unix(node.timestamp, 0),
+		Bits:            node.bits,
+		Nonce:           node.nonce,
+		PriceDerivation: float64(node.priceDerivation),
+		Signature:       node.signature,
 	}
 }
 
@@ -215,6 +232,14 @@ func (node *blockNode) CalcPastMedianTime() time.Time {
 	// even number, this code will be wrong.
 	medianTimestamp := timestamps[numNodes/2]
 	return time.Unix(medianTimestamp, 0)
+}
+
+// CalcPastMedianTime calculates the median time of the previous few blocks
+// prior to, and including, the block node.
+//
+// This function is safe for concurrent access.
+func (node *blockNode) CalcNextAbsorption() *big.Int {
+	return nil
 }
 
 // blockIndex provides facilities for keeping track of an in-memory index of the
@@ -315,6 +340,16 @@ func (bi *blockIndex) SetStatusFlags(node *blockNode, flags blockStatus) {
 func (bi *blockIndex) UnsetStatusFlags(node *blockNode, flags blockStatus) {
 	bi.Lock()
 	node.status &^= flags
+	bi.dirty[node] = struct{}{}
+	bi.Unlock()
+}
+
+// SetSupplyChange f...
+//
+// This function is safe for concurrent access.
+func (bi *blockIndex) SetSupplyChange(node *blockNode, supplyChange *big.Int) {
+	bi.Lock()
+	node.supplyChange = supplyChange
 	bi.dirty[node] = struct{}{}
 	bi.Unlock()
 }

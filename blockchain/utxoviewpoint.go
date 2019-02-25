@@ -6,12 +6,13 @@ package blockchain
 
 import (
 	"fmt"
+	"math/big"
 
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/database"
 	"github.com/endurio/ndrd/txscript"
-	"github.com/endurio/ndrd/wire"
 	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/wire"
 )
 
 // txoFlags is a bitmask defining additional information and state for a
@@ -95,6 +96,11 @@ func (entry *UtxoEntry) Amount() int64 {
 // PkScript returns the public key script for the output.
 func (entry *UtxoEntry) PkScript() []byte {
 	return entry.pkScript
+}
+
+// TokenID returns the identity of the output token.
+func (entry *UtxoEntry) TokenID() wire.TokenIdentity {
+	return wire.TokenID(entry.pkScript)
 }
 
 // Clone returns a shallow copy of the utxo entry.
@@ -195,7 +201,7 @@ func (view *UtxoViewpoint) AddTxOut(tx *util.Tx, txOutIdx uint32, blockHeight in
 // unspendable to the view.  When the view already has entries for any of the
 // outputs, they are simply marked unspent.  All fields will be updated for
 // existing entries since it's possible it has changed during a reorg.
-func (view *UtxoViewpoint) AddTxOuts(tx *util.Tx, blockHeight int32) {
+func (view *UtxoViewpoint) AddTxOuts(tx *util.Tx, blockHeight int32) (totalSTB int64) {
 	// Loop all of the transaction outputs and add those which are not
 	// provably unspendable.
 	isCoinBase := IsCoinBase(tx)
@@ -208,7 +214,12 @@ func (view *UtxoViewpoint) AddTxOuts(tx *util.Tx, blockHeight int32) {
 		// transaction is fully spent.
 		prevOut.Index = uint32(txOutIdx)
 		view.addTxOut(prevOut, txOut, isCoinBase, blockHeight)
+		if txOut.TokenID() == wire.STB {
+			// Ignore overflow since tx already passes all the validations.
+			totalSTB += txOut.Value
+		}
 	}
+	return totalSTB
 }
 
 // connectTransaction updates the view by adding all new utxos created by the
@@ -216,12 +227,13 @@ func (view *UtxoViewpoint) AddTxOuts(tx *util.Tx, blockHeight int32) {
 // spent.  In addition, when the 'stxos' argument is not nil, it will be updated
 // to append an entry for each spent txout.  An error will be returned if the
 // view does not contain the required utxos.
-func (view *UtxoViewpoint) connectTransaction(tx *util.Tx, blockHeight int32, stxos *[]SpentTxOut) error {
+func (view *UtxoViewpoint) connectTransaction(tx *util.Tx, blockHeight int32,
+	stxos *[]SpentTxOut) (balance int64, err error) {
 	// Coinbase transactions don't have any inputs to spend.
 	if IsCoinBase(tx) {
 		// Add the transaction's outputs as available utxos.
-		view.AddTxOuts(tx, blockHeight)
-		return nil
+		balance := view.AddTxOuts(tx, blockHeight)
+		return balance, nil
 	}
 
 	// Spend the referenced utxos by marking them spent in the view and,
@@ -232,7 +244,7 @@ func (view *UtxoViewpoint) connectTransaction(tx *util.Tx, blockHeight int32, st
 		// never happen unless there is a bug is introduced in the code.
 		entry := view.entries[txIn.PreviousOutPoint]
 		if entry == nil {
-			return AssertError(fmt.Sprintf("view missing input %v",
+			return 0, AssertError(fmt.Sprintf("view missing input %v",
 				txIn.PreviousOutPoint))
 		}
 
@@ -252,11 +264,16 @@ func (view *UtxoViewpoint) connectTransaction(tx *util.Tx, blockHeight int32, st
 		// relevant details have been accessed since spending it might
 		// clear the fields from memory in the future.
 		entry.Spend()
+
+		// Ignore overflow since tx already passes all the validations.
+		if entry.TokenID() == wire.STB {
+			balance -= entry.Amount()
+		}
 	}
 
 	// Add the transaction's outputs as available utxos.
-	view.AddTxOuts(tx, blockHeight)
-	return nil
+	balance += view.AddTxOuts(tx, blockHeight)
+	return balance, nil
 }
 
 // connectTransactions updates the view by adding all new utxos created by all
@@ -264,18 +281,21 @@ func (view *UtxoViewpoint) connectTransaction(tx *util.Tx, blockHeight int32, st
 // spend as spent, and setting the best hash for the view to the passed block.
 // In addition, when the 'stxos' argument is not nil, it will be updated to
 // append an entry for each spent txout.
-func (view *UtxoViewpoint) connectTransactions(block *util.Block, stxos *[]SpentTxOut) error {
+func (view *UtxoViewpoint) connectTransactions(block *util.Block, stxos *[]SpentTxOut) (*big.Int, error) {
+	totalBalance := new(big.Int)
+
 	for _, tx := range block.Transactions() {
-		err := view.connectTransaction(tx, block.Height(), stxos)
+		balance, err := view.connectTransaction(tx, block.Height(), stxos)
 		if err != nil {
-			return err
+			return nil, err
 		}
+		totalBalance.Add(totalBalance, big.NewInt(balance))
 	}
 
 	// Update the best hash for view to include this block since all of its
 	// transactions have been connected.
 	view.SetBestHash(block.Hash())
-	return nil
+	return totalBalance, nil
 }
 
 // fetchEntryByHash attempts to find any available utxo for the given hash by
@@ -412,8 +432,7 @@ func (view *UtxoViewpoint) disconnectTransactions(db database.DB, block *util.Bl
 				}
 				if utxo == nil {
 					return AssertError(fmt.Sprintf("unable "+
-						"to resurrect legacy stxo %v",
-						*originOut))
+						"to resurrect legacy stxo %v", *originOut))
 				}
 
 				stxo.Height = utxo.BlockHeight()

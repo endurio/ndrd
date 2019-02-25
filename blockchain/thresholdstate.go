@@ -127,6 +127,11 @@ func newThresholdCaches(numCaches uint32) []thresholdStateCache {
 //
 // This function MUST be called with the chain state lock held (for writes).
 func (b *BlockChain) thresholdState(prevNode *blockNode, checker thresholdConditionChecker, cache *thresholdStateCache) (ThresholdState, error) {
+	if checker.BeginTime() == 0 {
+		// activate any deployment that starts from genesis block
+		return ThresholdActive, nil
+	}
+
 	// The threshold state for the window that contains the genesis block is
 	// defined by definition.
 	confirmationWindow := int32(checker.MinerConfirmationWindow())

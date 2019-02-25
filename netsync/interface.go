@@ -10,8 +10,8 @@ import (
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/mempool"
 	"github.com/endurio/ndrd/peer"
-	"github.com/endurio/ndrd/wire"
 	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/wire"
 )
 
 // PeerNotifier exposes methods to notify peers of status changes to
@@ -20,11 +20,15 @@ import (
 type PeerNotifier interface {
 	AnnounceNewTransactions(newTxs []*mempool.TxDesc)
 
+	AnnounceNewOrders(newOrders []*mempool.OdrDesc)
+
 	UpdatePeerHeights(latestBlkHash *chainhash.Hash, latestHeight int32, updateSource *peer.Peer)
 
 	RelayInventory(invVect *wire.InvVect, data interface{})
 
 	TransactionConfirmed(tx *util.Tx)
+
+	OrderFilled(odr *util.Odr)
 }
 
 // Config is a configuration struct used to initialize a new SyncManager.
@@ -32,6 +36,7 @@ type Config struct {
 	PeerNotifier PeerNotifier
 	Chain        *blockchain.BlockChain
 	TxMemPool    *mempool.TxPool
+	OdrMemBook   *mempool.OdrBook
 	ChainParams  *chaincfg.Params
 
 	DisableCheckpoints bool
