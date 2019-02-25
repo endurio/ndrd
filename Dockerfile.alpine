@@ -1,7 +1,7 @@
 # Build image
 FROM golang:1.10.3 as BUILD
 
-WORKDIR /go/src/github.com/btcsuite/btcd
+WORKDIR /go/src/github.com/endurio/ndrd
 COPY . .
 
 RUN go get -u github.com/Masterminds/glide

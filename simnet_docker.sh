@@ -67,7 +67,7 @@ do
 	echo "Node: $NAME"
 	if [ ! "$(docker ps -qaf name=$NAME)" ]; then
 		docker run -d --name=$NAME --network=$NETWORK --publish=$PORT:$PORT --publish=$RPCPORT:$RPCPORT\
-				btcsuite/btcd:alpine\
+				endurio/ndrd:alpine\
 				btcd --simnet --listen=:$PORT --miningaddr=${MINING_ADDRS[$i]}\
 				--rpclisten=:$RPCPORT --rpcuser=a --rpcpass=a\
 				--nobanning $ADDPEER
