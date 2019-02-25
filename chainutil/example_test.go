@@ -9,7 +9,7 @@ import (
 func ExampleAmount() {
 
 	a := chainutil.Amount(0)
-	fmt.Println("Zero Satoshi:", a)
+	fmt.Println("Zero Atom:", a)
 
 	a = chainutil.Amount(1e8)
 	fmt.Println("100,000,000 Satoshis:", a)
@@ -17,7 +17,7 @@ func ExampleAmount() {
 	a = chainutil.Amount(1e5)
 	fmt.Println("100,000 Satoshis:", a)
 	// Output:
-	// Zero Satoshi: 0 BTC
+	// Zero Atom: 0 BTC
 	// 100,000,000 Satoshis: 1 BTC
 	// 100,000 Satoshis: 0.001 BTC
 }
@@ -60,16 +60,16 @@ func ExampleNewAmount() {
 func ExampleAmount_unitConversions() {
 	amount := chainutil.Amount(44433322211100)
 
-	fmt.Println("Satoshi to kBTC:", amount.Format(chainutil.AmountKiloBTC))
-	fmt.Println("Satoshi to BTC:", amount)
-	fmt.Println("Satoshi to MilliBTC:", amount.Format(chainutil.AmountMilliBTC))
-	fmt.Println("Satoshi to MicroBTC:", amount.Format(chainutil.AmountMicroBTC))
-	fmt.Println("Satoshi to Satoshi:", amount.Format(chainutil.AmountSatoshi))
+	fmt.Println("Atom to kBTC:", amount.Format(chainutil.AmountKiloBTC))
+	fmt.Println("Atom to BTC:", amount)
+	fmt.Println("Atom to MilliBTC:", amount.Format(chainutil.AmountMilliBTC))
+	fmt.Println("Atom to MicroBTC:", amount.Format(chainutil.AmountMicroBTC))
+	fmt.Println("Atom to Atom:", amount.Format(chainutil.AmountSatoshi))
 
 	// Output:
-	// Satoshi to kBTC: 444.333222111 kBTC
-	// Satoshi to BTC: 444333.222111 BTC
-	// Satoshi to MilliBTC: 444333222.111 mBTC
-	// Satoshi to MicroBTC: 444333222111 μBTC
-	// Satoshi to Satoshi: 44433322211100 Satoshi
+	// Atom to kBTC: 444.333222111 kBTC
+	// Atom to BTC: 444333.222111 BTC
+	// Atom to MilliBTC: 444333222.111 mBTC
+	// Atom to MicroBTC: 444333222111 μBTC
+	// Atom to Atom: 44433322211100 Atom
 }

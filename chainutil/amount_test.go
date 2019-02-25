@@ -159,7 +159,7 @@ func TestAmountUnitConversions(t *testing.T) {
 			amount:    44433322211100,
 			unit:      AmountSatoshi,
 			converted: 44433322211100,
-			s:         "44433322211100 Satoshi",
+			s:         "44433322211100 Atom",
 		},
 		{
 
@@ -265,7 +265,7 @@ func TestAmountMulF64(t *testing.T) {
 			name: "Round up",
 			amt:  50, // 50 Satoshis
 			mul:  0.01,
-			res:  1, // 1 Satoshi
+			res:  1, // 1 Atom
 		},
 		{
 			name: "Multiply by 0.",
@@ -275,9 +275,9 @@ func TestAmountMulF64(t *testing.T) {
 		},
 		{
 			name: "Multiply 1 by 0.5.",
-			amt:  1, // 1 Satoshi
+			amt:  1, // 1 Atom
 			mul:  0.5,
-			res:  1, // 1 Satoshi
+			res:  1, // 1 Atom
 		},
 		{
 			name: "Multiply 100 by 66%.",

@@ -271,7 +271,7 @@ func TestAmountCompression(t *testing.T) {
 			compressed:   0,
 		},
 		{
-			name:         "546 Satoshi (current network dust value)",
+			name:         "546 Atom (current network dust value)",
 			uncompressed: 546,
 			compressed:   4911,
 		},

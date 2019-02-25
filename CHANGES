@@ -769,7 +769,7 @@ Changes in 0.5.0 (Mon Jan 13 2014)
     - Update getblock to support new optional verbose flag
     - Update raw transactions to fully match the reference client including
       support for all transaction types and address types
-    - Correct getrawmempool fee field to return BTC instead of Satoshi
+    - Correct getrawmempool fee field to return BTC instead of Atom
     - Correct getpeerinfo service flag to return 8 digit string so it
       matches the reference client
     - Correct verifychain to return a boolean

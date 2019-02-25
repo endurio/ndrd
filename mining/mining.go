@@ -55,7 +55,7 @@ type TxDesc struct {
 	// Fee is the total fee the transaction associated with the entry pays.
 	Fee int64
 
-	// FeePerKB is the fee the transaction pays in Satoshi per 1000 bytes.
+	// FeePerKB is the fee the transaction pays in Atom per 1000 bytes.
 	FeePerKB int64
 }
 
@@ -665,7 +665,7 @@ mempoolLoop:
 		prioItem.priority = CalcPriority(tx.MsgTx(), utxos,
 			nextBlockHeight)
 
-		// Calculate the fee in Satoshi/kB.
+		// Calculate the fee in Atom/kB.
 		prioItem.feePerKB = txDesc.FeePerKB
 		prioItem.fee = txDesc.Fee
 
@@ -1088,7 +1088,7 @@ membookLoop:
 		// Order always have maximum priority
 		prioItem.priority = math.MaxFloat64
 
-		// Calculate the fee in Satoshi/kB.
+		// Calculate the fee in Atom/kB.
 		prioItem.feePerKB = 0
 		prioItem.fee = 0
 

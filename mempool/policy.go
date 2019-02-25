@@ -47,7 +47,7 @@ const (
 	// for a transaction to be treated as free for relay and mining
 	// purposes.  It is also used to help determine if a transaction is
 	// considered dust and as a base for calculating minimum required fees
-	// for larger transactions.  This value is in Satoshi/1000 bytes.
+	// for larger transactions.  This value is in Atom/1000 bytes.
 	DefaultMinRelayTxFee = chainutil.Amount(0)
 
 	// maxStandardMultiSigKeys is the maximum number of public keys allowed
@@ -62,7 +62,7 @@ const (
 func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee chainutil.Amount) int64 {
 	// Calculate the minimum fee for a transaction to be allowed into the
 	// mempool and relayed by scaling the base fee (which is the minimum
-	// free transaction relay fee).  minTxRelayFee is in Satoshi/kB so
+	// free transaction relay fee).  minTxRelayFee is in Atom/kB so
 	// multiply by serializedSize (which is in bytes) and divide by 1000 to
 	// get minimum Satoshis.
 	minFee := (serializedSize * int64(minRelayTxFee)) / 1000
@@ -256,7 +256,7 @@ func isDust(txOut *wire.TxOut, minRelayTxFee chainutil.Amount) bool {
 
 	// The output is considered dust if the cost to the network to spend the
 	// coins is more than 1/3 of the minimum free transaction relay fee.
-	// minFreeTxRelayFee is in Satoshi/KB, so multiply by 1000 to
+	// minFreeTxRelayFee is in Atom/KB, so multiply by 1000 to
 	// convert to bytes.
 	//
 	// Using the typical values for a pay-to-pubkey-hash transaction from

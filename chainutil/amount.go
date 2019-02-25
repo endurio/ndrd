@@ -29,7 +29,7 @@ const (
 )
 
 // String returns the unit as a string.  For recognized units, the SI
-// prefix is used, or "Satoshi" for the base unit.  For all unrecognized
+// prefix is used, or "Atom" for the base unit.  For all unrecognized
 // units, "1eN BTC" is returned, where N is the AmountUnit.
 func (u AmountUnit) String() string {
 	switch u {
@@ -44,14 +44,14 @@ func (u AmountUnit) String() string {
 	case AmountMicroBTC:
 		return "μBTC"
 	case AmountSatoshi:
-		return "Satoshi"
+		return "Atom"
 	default:
 		return "1e" + strconv.FormatInt(int64(u), 10) + " BTC"
 	}
 }
 
 // Amount represents the base bitcoin monetary unit (colloquially referred
-// to as a `Satoshi').  A single Amount is equal to 1e-8 of a bitcoin.
+// to as a `Atom').  A single Amount is equal to 1e-8 of a bitcoin.
 type Amount int64
 
 // round converts a floating point number, which may or may not be representable
@@ -70,8 +70,8 @@ func round(f float64) Amount {
 // does not check that the amount is within the total amount of bitcoin
 // producible as f may not refer to an amount at a single moment in time.
 //
-// NewAmount is for specifically for converting BTC to Satoshi.
-// For creating a new Amount with an int64 value which denotes a quantity of Satoshi,
+// NewAmount is for specifically for converting BTC to Atom.
+// For creating a new Amount with an int64 value which denotes a quantity of Atom,
 // do a simple type conversion from type int64 to Amount.
 // See GoDoc for example: http://godoc.org/github.com/endurio/ndrd/chainutil#example-Amount
 func NewAmount(f float64) (Amount, error) {
@@ -103,7 +103,7 @@ func (a Amount) ToBTC() float64 {
 // Format formats a monetary amount counted in bitcoin base units as a
 // string for a given unit.  The conversion will succeed for any unit,
 // however, known units will be formated with an appended label describing
-// the units with SI notation, or "Satoshi" for the base unit.
+// the units with SI notation, or "Atom" for the base unit.
 func (a Amount) Format(u AmountUnit) string {
 	units := " " + u.String()
 	return strconv.FormatFloat(a.ToUnit(u), 'f', -int(u+8), 64) + units
