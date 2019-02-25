@@ -40,7 +40,7 @@ import (
 	"github.com/endurio/ndrd/peer"
 	"github.com/endurio/ndrd/txscript"
 	"github.com/endurio/ndrd/wire"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 	"github.com/btcsuite/websocket"
 )
 
@@ -555,7 +555,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 	params := s.cfg.ChainParams
 	for encodedAddr, amount := range c.Amounts {
 		// Ensure amount is in the valid range for monetary amounts.
-		if amount <= 0 || amount > util.MaxSatoshi {
+		if amount <= 0 || amount > chainutil.MaxSatoshi {
 			return nil, &chainjson.RPCError{
 				Code:    chainjson.ErrRPCType,
 				Message: "Invalid amount",
@@ -563,7 +563,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 		}
 
 		// Decode the provided address.
-		addr, err := util.DecodeAddress(encodedAddr, params)
+		addr, err := chainutil.DecodeAddress(encodedAddr, params)
 		if err != nil {
 			return nil, &chainjson.RPCError{
 				Code:    chainjson.ErrRPCInvalidAddressOrKey,
@@ -575,8 +575,8 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 		// the network encoded with the address matches the network the
 		// server is currently on.
 		switch addr.(type) {
-		case *util.AddressPubKeyHash:
-		case *util.AddressScriptHash:
+		case *chainutil.AddressPubKeyHash:
+		case *chainutil.AddressScriptHash:
 		default:
 			return nil, &chainjson.RPCError{
 				Code:    chainjson.ErrRPCInvalidAddressOrKey,
@@ -599,7 +599,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 		}
 
 		// Convert the amount to satoshi.
-		satoshi, err := util.NewAmount(amount)
+		satoshi, err := chainutil.NewAmount(amount)
 		if err != nil {
 			context := "Failed to convert amount"
 			return nil, internalRPCError(err.Error(), context)
@@ -738,7 +738,7 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap
 
 		var vout chainjson.Vout
 		vout.N = uint32(i)
-		vout.Value = util.Amount(v.Value).ToBTC()
+		vout.Value = chainutil.Amount(v.Value).ToBTC()
 		vout.ScriptPubKey.Addresses = encodedAddrs
 		vout.ScriptPubKey.Asm = disbuf
 		vout.ScriptPubKey.Hex = hex.EncodeToString(v.PkScript)
@@ -767,7 +767,7 @@ func createTxRawResult(chainParams *chaincfg.Params, mtx *wire.MsgTx,
 		Txid:     txHash,
 		Hash:     mtx.WitnessHash().String(),
 		Size:     int32(mtx.SerializeSize()),
-		Vsize:    int32(mempool.GetTxVirtualSize(util.NewTx(mtx))),
+		Vsize:    int32(mempool.GetTxVirtualSize(chainutil.NewTx(mtx))),
 		Vin:      createVinList(mtx),
 		Vout:     createVoutList(mtx, chainParams, nil),
 		Version:  mtx.Version,
@@ -801,7 +801,7 @@ func createOdrRawResult(chainParams *chaincfg.Params, modr *wire.MsgOdr,
 		Odrid:    odrHash,
 		Hash:     modr.WitnessHash().String(),
 		Size:     int32(modr.SerializeSize()),
-		Vsize:    int32(mempool.GetTxVirtualSize(util.NewOdr(modr).Tx)),
+		Vsize:    int32(mempool.GetTxVirtualSize(chainutil.NewOdr(modr).Tx)),
 		Vin:      createVinList(modr.MsgTx),
 		Vout:     createVoutList(modr.MsgTx, chainParams, nil),
 		Version:  modr.Version,
@@ -881,7 +881,7 @@ func handleDecodeScript(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 	}
 
 	// Convert the script itself to a pay-to-script-hash address.
-	p2sh, err := util.NewAddressScriptHash(script, s.cfg.ChainParams)
+	p2sh, err := chainutil.NewAddressScriptHash(script, s.cfg.ChainParams)
 	if err != nil {
 		context := "Failed to convert script to pay-to-script-hash"
 		return nil, internalRPCError(err.Error(), context)
@@ -1135,7 +1135,7 @@ func handleGetBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	// The verbose flag is set, so generate the JSON object and return it.
 
 	// Deserialize the block.
-	blk, err := util.NewBlockFromBytes(blkBytes)
+	blk, err := chainutil.NewBlockFromBytes(blkBytes)
 	if err != nil {
 		context := "Failed to deserialize block"
 		return nil, internalRPCError(err.Error(), context)
@@ -1628,7 +1628,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 		// Choose a payment address at random if the caller requests a
 		// full coinbase as opposed to only the pertinent details needed
 		// to create their own coinbase.
-		var payAddr util.Address
+		var payAddr chainutil.Address
 		if !useCoinbaseValue {
 			payAddr = mining.Address(cfg.miningKey, s.cfg.ChainParams)
 		}
@@ -1698,7 +1698,7 @@ func (state *gbtWorkState) updateBlockTemplate(s *rpcServer, useCoinbaseValue bo
 			template.ValidPayAddress = true
 
 			// Update the merkle root.
-			block := util.NewBlock(template.Block)
+			block := chainutil.NewBlock(template.Block)
 			merkles := blockchain.BuildMerkleTreeStore(block.Transactions(), false)
 			template.Block.Header.MerkleRoot = *merkles[len(merkles)-1]
 		}
@@ -1786,7 +1786,7 @@ func (state *gbtWorkState) blockTemplateResult(useCoinbaseValue bool, submitOld 
 			return nil, internalRPCError(err.Error(), context)
 		}
 
-		bTx := util.NewTx(tx)
+		bTx := chainutil.NewTx(tx)
 		resultTx := chainjson.GetBlockTemplateResultTx{
 			Data:    hex.EncodeToString(txBuf.Bytes()),
 			Hash:    txHash.String(),
@@ -2186,7 +2186,7 @@ func handleGetBlockTemplateProposal(s *rpcServer, request *chainjson.TemplateReq
 			Message: "Block decode failed: " + err.Error(),
 		}
 	}
-	block := util.NewBlock(&msgBlock)
+	block := chainutil.NewBlock(&msgBlock)
 
 	// Ensure the block is building from the expected previous block.
 	expectedPrevHash := s.cfg.Chain.BestSnapshot().Hash
@@ -2919,7 +2919,7 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	txOutReply := &chainjson.GetTxOutResult{
 		BestBlock:     bestBlockHash,
 		Confirmations: int64(confirmations),
-		Value:         util.Amount(value).ToBTC(),
+		Value:         chainutil.Amount(value).ToBTC(),
 		ScriptPubKey: chainjson.ScriptPubKeyResult{
 			Asm:       disbuf,
 			Hex:       hex.EncodeToString(pkScript),
@@ -2994,7 +2994,7 @@ func handlePing(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (inter
 type retrievedTx struct {
 	txBytes []byte
 	blkHash *chainhash.Hash // Only set when transaction is in a block.
-	tx      *util.Tx
+	tx      *chainutil.Tx
 }
 
 // fetchInputTxos fetches the outpoints from all transactions referenced by the
@@ -3176,7 +3176,7 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 			vinListEntry := &vinList[len(vinList)-1]
 			vinListEntry.PrevOut = &chainjson.PrevOut{
 				Addresses: encodedAddrs,
-				Value:     util.Amount(originTxOut.Value).ToBTC(),
+				Value:     chainutil.Amount(originTxOut.Value).ToBTC(),
 			}
 		}
 	}
@@ -3187,7 +3187,7 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 // fetchMempoolTxnsForAddress queries the address index for all unconfirmed
 // transactions that involve the provided address.  The results will be limited
 // by the number to skip and the number requested.
-func fetchMempoolTxnsForAddress(s *rpcServer, addr util.Address, numToSkip, numRequested uint32) ([]*util.Tx, uint32) {
+func fetchMempoolTxnsForAddress(s *rpcServer, addr chainutil.Address, numToSkip, numRequested uint32) ([]*chainutil.Tx, uint32) {
 	// There are no entries to return when there are less available than the
 	// number being skipped.
 	mpTxns := s.cfg.AddrIndex.UnconfirmedTxnsForAddress(addr)
@@ -3237,7 +3237,7 @@ func handleSearchRawTransactions(s *rpcServer, cmd interface{}, closeChan <-chan
 
 	// Attempt to decode the supplied address.
 	params := s.cfg.ChainParams
-	addr, err := util.DecodeAddress(c.Address, params)
+	addr, err := chainutil.DecodeAddress(c.Address, params)
 	if err != nil {
 		return nil, &chainjson.RPCError{
 			Code:    chainjson.ErrRPCInvalidAddressOrKey,
@@ -3492,7 +3492,7 @@ func handleSendRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan st
 	}
 
 	// Use 0 for the tag to represent local node.
-	tx := util.NewTx(&msgTx)
+	tx := chainutil.NewTx(&msgTx)
 	acceptedTxs, err := s.cfg.TxMemPool.ProcessTransaction(tx, false, false, 0)
 	if err != nil {
 		// When the error is a rule error, it means the transaction was
@@ -3570,7 +3570,7 @@ func handleSendRawOrder(s *rpcServer, cmd interface{}, closeChan <-chan struct{}
 	}
 
 	// Use 0 for the tag to represent local node.
-	order := util.NewOdr(msgOrder)
+	order := chainutil.NewOdr(msgOrder)
 	acceptedOrder, err := s.cfg.OdrMemBook.ProcessOrder(order)
 	if err != nil {
 		// When the error is a rule error, it means the order was
@@ -3693,7 +3693,7 @@ func handleSubmitBlock(s *rpcServer, cmd interface{}, closeChan <-chan struct{})
 		return nil, rpcDecodeHexError(hexStr)
 	}
 
-	block, err := util.NewBlockFromBytes(serializedBlock)
+	block, err := chainutil.NewBlockFromBytes(serializedBlock)
 	if err != nil {
 		return nil, &chainjson.RPCError{
 			Code:    chainjson.ErrRPCDeserialization,
@@ -3722,7 +3722,7 @@ func handleValidateAddress(s *rpcServer, cmd interface{}, closeChan <-chan struc
 	c := cmd.(*chainjson.ValidateAddressCmd)
 
 	result := chainjson.ValidateAddressChainResult{}
-	addr, err := util.DecodeAddress(c.Address, s.cfg.ChainParams)
+	addr, err := chainutil.DecodeAddress(c.Address, s.cfg.ChainParams)
 	if err != nil {
 		// Return the default value (false) for IsValid.
 		return result, nil
@@ -3791,7 +3791,7 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 
 	// Decode the provided address.
 	params := s.cfg.ChainParams
-	addr, err := util.DecodeAddress(c.Address, params)
+	addr, err := chainutil.DecodeAddress(c.Address, params)
 	if err != nil {
 		return nil, &chainjson.RPCError{
 			Code:    chainjson.ErrRPCInvalidAddressOrKey,
@@ -3800,7 +3800,7 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	}
 
 	// Only P2PKH addresses are valid for signing.
-	if _, ok := addr.(*util.AddressPubKeyHash); !ok {
+	if _, ok := addr.(*chainutil.AddressPubKeyHash); !ok {
 		return nil, &chainjson.RPCError{
 			Code:    chainjson.ErrRPCType,
 			Message: "Address is not a pay-to-pubkey-hash address",
@@ -3837,7 +3837,7 @@ func handleVerifyMessage(s *rpcServer, cmd interface{}, closeChan <-chan struct{
 	} else {
 		serializedPK = pk.SerializeUncompressed()
 	}
-	address, err := util.NewAddressPubKey(serializedPK, params)
+	address, err := chainutil.NewAddressPubKey(serializedPK, params)
 	if err != nil {
 		// Again mirror Bitcoin Core behavior, which treats error in public key
 		// reconstruction as invalid signature.
@@ -4371,7 +4371,7 @@ func genCertPair(certFile, keyFile string) error {
 
 	org := "ndrd autogenerated cert"
 	validUntil := time.Now().Add(10 * 365 * 24 * time.Hour)
-	cert, key, err := util.NewTLSCertPair(org, validUntil, nil)
+	cert, key, err := chainutil.NewTLSCertPair(org, validUntil, nil)
 	if err != nil {
 		return err
 	}
@@ -4486,7 +4486,7 @@ type rpcserverSyncManager interface {
 
 	// SubmitBlock submits the provided block to the network after
 	// processing it locally.
-	SubmitBlock(block *util.Block, flags blockchain.BehaviorFlags) (bool, error)
+	SubmitBlock(block *chainutil.Block, flags blockchain.BehaviorFlags) (bool, error)
 
 	// Pause pauses the sync manager until the returned channel is closed.
 	Pause() chan<- struct{}
@@ -4586,7 +4586,7 @@ func newRPCServer(config *rpcserverConfig) (*rpcServer, error) {
 func (s *rpcServer) handleBlockchainNotification(notification *blockchain.Notification) {
 	switch notification.Type {
 	case blockchain.NTBlockAccepted:
-		block, ok := notification.Data.(*util.Block)
+		block, ok := notification.Data.(*chainutil.Block)
 		if !ok {
 			rpcsLog.Warnf("Chain accepted notification is not a block.")
 			break
@@ -4598,7 +4598,7 @@ func (s *rpcServer) handleBlockchainNotification(notification *blockchain.Notifi
 		s.gbtWorkState.NotifyBlockConnected(block.Hash())
 
 	case blockchain.NTBlockConnected:
-		block, ok := notification.Data.(*util.Block)
+		block, ok := notification.Data.(*chainutil.Block)
 		if !ok {
 			rpcsLog.Warnf("Chain connected notification is not a block.")
 			break
@@ -4608,7 +4608,7 @@ func (s *rpcServer) handleBlockchainNotification(notification *blockchain.Notifi
 		s.ntfnMgr.NotifyBlockConnected(block)
 
 	case blockchain.NTBlockDisconnected:
-		block, ok := notification.Data.(*util.Block)
+		block, ok := notification.Data.(*chainutil.Block)
 		if !ok {
 			rpcsLog.Warnf("Chain disconnected notification is not a block.")
 			break

@@ -13,7 +13,7 @@ import (
 	"github.com/endurio/ndrd/netsync"
 	"github.com/endurio/ndrd/peer"
 	"github.com/endurio/ndrd/wire"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 )
 
 // rpcPeer provides a peer for use with the RPC server and implements the
@@ -253,7 +253,7 @@ func (b *rpcSyncMgr) IsCurrent() bool {
 //
 // This function is safe for concurrent access and is part of the
 // rpcserverSyncManager interface implementation.
-func (b *rpcSyncMgr) SubmitBlock(block *util.Block, flags blockchain.BehaviorFlags) (bool, error) {
+func (b *rpcSyncMgr) SubmitBlock(block *chainutil.Block, flags blockchain.BehaviorFlags) (bool, error) {
 	return b.syncMgr.ProcessBlock(block, flags)
 }
 

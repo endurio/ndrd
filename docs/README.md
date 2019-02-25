@@ -290,7 +290,7 @@ information.
     * [mempool](https://github.com/endurio/ndrd/tree/master/mempool) -
       Package mempool provides a policy-enforced pool of unmined bitcoin
       transactions.
-    * [util](https://github.com/endurio/ndrd/util) - Provides Bitcoin-specific
+    * [util](https://github.com/endurio/ndrd/chainutil) - Provides Bitcoin-specific
       convenience functions and types
     * [chainhash](https://github.com/endurio/ndrd/tree/master/chaincfg/chainhash) -
       Provides a generic hash type and associated functions that allows the

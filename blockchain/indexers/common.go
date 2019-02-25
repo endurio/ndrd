@@ -13,7 +13,7 @@ import (
 
 	"github.com/endurio/ndrd/blockchain"
 	"github.com/endurio/ndrd/database"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 )
 
 var (
@@ -54,13 +54,13 @@ type Indexer interface {
 	// main chain. The set of output spent within a block is also passed in
 	// so indexers can access the pevious output scripts input spent if
 	// required.
-	ConnectBlock(database.Tx, *util.Block, []blockchain.SpentTxOut) error
+	ConnectBlock(database.Tx, *chainutil.Block, []blockchain.SpentTxOut) error
 
 	// DisconnectBlock is invoked when a block has been disconnected from
 	// the main chain. The set of outputs scripts that were spent within
 	// this block is also returned so indexers can clean up the prior index
 	// state for this block
-	DisconnectBlock(database.Tx, *util.Block, []blockchain.SpentTxOut) error
+	DisconnectBlock(database.Tx, *chainutil.Block, []blockchain.SpentTxOut) error
 }
 
 // AssertError identifies an error that indicates an internal code consistency

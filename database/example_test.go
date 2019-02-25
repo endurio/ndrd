@@ -14,7 +14,7 @@ import (
 	"github.com/endurio/ndrd/database"
 	_ "github.com/endurio/ndrd/database/ffldb"
 	"github.com/endurio/ndrd/wire"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 )
 
 // This example demonstrates creating a new database.
@@ -136,7 +136,7 @@ func Example_blockStorageAndRetrieval() {
 	// and example.
 	err = db.Update(func(tx database.Tx) error {
 		genesisBlock := chaincfg.MainNetParams.GenesisBlock
-		return tx.StoreBlock(util.NewBlock(genesisBlock))
+		return tx.StoreBlock(chainutil.NewBlock(genesisBlock))
 	})
 	if err != nil {
 		fmt.Println(err)

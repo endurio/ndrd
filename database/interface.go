@@ -9,7 +9,7 @@ package database
 
 import (
 	"github.com/endurio/ndrd/chaincfg/chainhash"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 )
 
 // Cursor represents a cursor over key/value pairs and nested buckets of a
@@ -227,7 +227,7 @@ type Tx interface {
 	//   - ErrTxClosed if the transaction has already been closed
 	//
 	// Other errors are possible depending on the implementation.
-	StoreBlock(block *util.Block) error
+	StoreBlock(block *chainutil.Block) error
 
 	// HasBlock returns whether or not a block with the given hash exists
 	// in the database.

@@ -16,7 +16,7 @@ import (
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/mining"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 	"github.com/endurio/ndrd/wire"
 )
 
@@ -61,7 +61,7 @@ type Config struct {
 	// ProcessBlock defines the function to call with any solved blocks.
 	// It typically must run the provided block through the same set of
 	// rules and handling as any other block coming from the network.
-	ProcessBlock func(*util.Block, blockchain.BehaviorFlags) (bool, error)
+	ProcessBlock func(*chainutil.Block, blockchain.BehaviorFlags) (bool, error)
 
 	// ConnectedCount defines the function to use to obtain how many other
 	// peers the server is connected to.  This is used by the automatic
@@ -152,7 +152,7 @@ out:
 
 // submitBlock submits the passed block to network after ensuring it passes all
 // of the consensus validation rules.
-func (m *CPUMiner) submitBlock(block *util.Block) bool {
+func (m *CPUMiner) submitBlock(block *chainutil.Block) bool {
 	m.submitBlockLock.Lock()
 	defer m.submitBlockLock.Unlock()
 
@@ -191,7 +191,7 @@ func (m *CPUMiner) submitBlock(block *util.Block) bool {
 	// The block was accepted.
 	coinbaseTx := block.MsgBlock().Transactions[0].TxOut[0]
 	log.Infof("Block submitted via CPU miner accepted (hash %s, "+
-		"amount %v)", block.Hash(), util.Amount(coinbaseTx.Value))
+		"amount %v)", block.Hash(), chainutil.Amount(coinbaseTx.Value))
 	return true
 }
 
@@ -368,7 +368,7 @@ out:
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
 		if m.solveBlock(template.Block, curHeight+1, ticker, quit) {
-			block := util.NewBlock(template.Block)
+			block := chainutil.NewBlock(template.Block)
 			m.submitBlock(block)
 		}
 	}
@@ -620,7 +620,7 @@ func (m *CPUMiner) GenerateNBlocks(n uint32) ([]*chainhash.Hash, error) {
 		// a new block template can be generated.  When the return is
 		// true a solution was found, so submit the solved block.
 		if m.solveBlock(template.Block, curHeight+1, ticker, nil) {
-			block := util.NewBlock(template.Block)
+			block := chainutil.NewBlock(template.Block)
 			m.submitBlock(block)
 			blockHashes[i] = block.Hash()
 			i++

@@ -12,7 +12,7 @@ import (
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/database"
 	"github.com/endurio/ndrd/wire"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 )
 
 var (
@@ -68,7 +68,7 @@ func dbFetchIndexerTip(dbTx database.Tx, idxKey []byte) (*chainhash.Hash, int32,
 // given block using the provided indexer and updates the tip of the indexer
 // accordingly.  An error will be returned if the current tip for the indexer is
 // not the previous block for the passed block.
-func dbIndexConnectBlock(dbTx database.Tx, indexer Indexer, block *util.Block,
+func dbIndexConnectBlock(dbTx database.Tx, indexer Indexer, block *chainutil.Block,
 	stxo []blockchain.SpentTxOut) error {
 
 	// Assert that the block being connected properly connects to the
@@ -98,7 +98,7 @@ func dbIndexConnectBlock(dbTx database.Tx, indexer Indexer, block *util.Block,
 // given block using the provided indexer and updates the tip of the indexer
 // accordingly.  An error will be returned if the current tip for the indexer is
 // not the passed block.
-func dbIndexDisconnectBlock(dbTx database.Tx, indexer Indexer, block *util.Block,
+func dbIndexDisconnectBlock(dbTx database.Tx, indexer Indexer, block *chainutil.Block,
 	stxo []blockchain.SpentTxOut) error {
 
 	// Assert that the block being disconnected is the current tip of the
@@ -303,13 +303,13 @@ func (m *Manager) Init(chain *blockchain.BlockChain, interrupt <-chan struct{}) 
 			// loaded directly since it is no longer in the main
 			// chain and thus the chain.BlockByHash function would
 			// error.
-			var block *util.Block
+			var block *chainutil.Block
 			err := m.db.View(func(dbTx database.Tx) error {
 				blockBytes, err := dbTx.FetchBlock(hash)
 				if err != nil {
 					return err
 				}
-				block, err = util.NewBlockFromBytes(blockBytes)
+				block, err = chainutil.NewBlockFromBytes(blockBytes)
 				if err != nil {
 					return err
 				}
@@ -499,7 +499,7 @@ func dbFetchTx(dbTx database.Tx, hash *chainhash.Hash) (*wire.MsgTx, error) {
 // checks, and invokes each indexer.
 //
 // This is part of the blockchain.IndexManager interface.
-func (m *Manager) ConnectBlock(dbTx database.Tx, block *util.Block,
+func (m *Manager) ConnectBlock(dbTx database.Tx, block *chainutil.Block,
 	stxos []blockchain.SpentTxOut) error {
 
 	// Call each of the currently active optional indexes with the block
@@ -519,7 +519,7 @@ func (m *Manager) ConnectBlock(dbTx database.Tx, block *util.Block,
 // the index entries associated with the block.
 //
 // This is part of the blockchain.IndexManager interface.
-func (m *Manager) DisconnectBlock(dbTx database.Tx, block *util.Block,
+func (m *Manager) DisconnectBlock(dbTx database.Tx, block *chainutil.Block,
 	stxo []blockchain.SpentTxOut) error {
 
 	// Call each of the currently active optional indexes with the block

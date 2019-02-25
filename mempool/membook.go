@@ -18,7 +18,7 @@ import (
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/mining"
 	"github.com/endurio/ndrd/txscript"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 	"github.com/endurio/ndrd/wire"
 )
 
@@ -109,7 +109,7 @@ func (ob *OdrBook) HaveOrder(hash *chainhash.Hash) bool {
 // RemoveOrder.  See the comment for RemoveOrder for more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (ob *OdrBook) removeOrder(order *util.Odr) {
+func (ob *OdrBook) removeOrder(order *chainutil.Odr) {
 	txHash := order.Hash()
 
 	// Remove the order if needed.
@@ -135,7 +135,7 @@ func (ob *OdrBook) removeOrder(order *util.Odr) {
 // they would otherwise become orphans.
 //
 // This function is safe for concurrent access.
-func (ob *OdrBook) RemoveOrder(order *util.Odr) {
+func (ob *OdrBook) RemoveOrder(order *chainutil.Odr) {
 	// Protect concurrent access.
 	ob.mtx.Lock()
 	ob.removeOrder(order)
@@ -149,7 +149,7 @@ func (ob *OdrBook) RemoveOrder(order *util.Odr) {
 // contain orders which were previously unknown to the memory pool.
 //
 // This function is safe for concurrent access.
-func (ob *OdrBook) RemoveDoubleSpends(tx *util.Tx) {
+func (ob *OdrBook) RemoveDoubleSpends(tx *chainutil.Tx) {
 	// Protect concurrent access.
 	ob.mtx.Lock()
 	for _, txIn := range tx.MsgTx().TxIn {
@@ -193,15 +193,15 @@ func insertOrder(orders *list.List, orderDesc *OdrDesc) *list.Element {
 // helper for maybeAcceptOrder.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (ob *OdrBook) addOrder(odr *util.Odr, stb, ndr int64, height int32) *OdrDesc {
+func (ob *OdrBook) addOrder(odr *chainutil.Odr, stb, ndr int64, height int32) *OdrDesc {
 	odrDesc := &OdrDesc{
 		OdrDesc: mining.OdrDesc{
 			Odr:    odr,
 			Added:  time.Now(),
 			Height: height,
 			Bid:    ndr > 0,
-			Amount: util.Amount(abs(ndr)),
-			Payout: util.Amount(abs(stb)),
+			Amount: chainutil.Amount(abs(ndr)),
+			Payout: chainutil.Amount(abs(stb)),
 		},
 	}
 
@@ -227,7 +227,7 @@ func (ob *OdrBook) addOrder(odr *util.Odr, stb, ndr int64, height int32) *OdrDes
 // main chain.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (ob *OdrBook) checkBookDoubleSpend(order *util.Odr) error {
+func (ob *OdrBook) checkBookDoubleSpend(order *chainutil.Odr) error {
 	for _, txIn := range order.TxIn {
 		if element, exists := ob.outpoints[txIn.PreviousOutPoint]; exists {
 			str := fmt.Sprintf("output %v already spent by order %v in the memory pool",
@@ -242,7 +242,7 @@ func (ob *OdrBook) checkBookDoubleSpend(order *util.Odr) error {
 // CheckSpend checks whether the passed outpoint is already spent by a
 // order in the mempool. If that's the case the spending order will
 // be returned, if not nil will be returned.
-func (ob *OdrBook) CheckSpend(op wire.OutPoint) *util.Tx {
+func (ob *OdrBook) CheckSpend(op wire.OutPoint) *chainutil.Tx {
 	ob.mtx.RLock()
 	txR := ob.outpoints[op]
 	ob.mtx.RUnlock()
@@ -256,7 +256,7 @@ func (ob *OdrBook) CheckSpend(op wire.OutPoint) *util.Tx {
 // transaction pool.
 //
 // This function MUST be called with the mempool lock held (for reads).
-func (ob *OdrBook) fetchInputUtxos(order *util.Odr) (*blockchain.UtxoViewpoint, error) {
+func (ob *OdrBook) fetchInputUtxos(order *chainutil.Odr) (*blockchain.UtxoViewpoint, error) {
 	utxoView, err := ob.cfg.FetchUtxoView(order.Tx)
 	if err != nil {
 		return nil, err
@@ -270,7 +270,7 @@ func (ob *OdrBook) fetchInputUtxos(order *util.Odr) (*blockchain.UtxoViewpoint, 
 // orphans.
 //
 // This function is safe for concurrent access.
-func (ob *OdrBook) FetchOrder(txHash *chainhash.Hash) (*util.Odr, error) {
+func (ob *OdrBook) FetchOrder(txHash *chainhash.Hash) (*chainutil.Odr, error) {
 	// Protect concurrent access.
 	ob.mtx.RLock()
 	element, exists := ob.book[*txHash]
@@ -288,7 +288,7 @@ func (ob *OdrBook) FetchOrder(txHash *chainhash.Hash) (*util.Odr, error) {
 // more details.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (ob *OdrBook) maybeAcceptOrder(order *util.Odr) (*OdrDesc, error) {
+func (ob *OdrBook) maybeAcceptOrder(order *chainutil.Odr) (*OdrDesc, error) {
 	txHash := order.Hash()
 
 	// If a transaction has iwtness data, and segwit isn't active yet, If
@@ -483,7 +483,7 @@ func (ob *OdrBook) maybeAcceptOrder(order *util.Odr) (*OdrDesc, error) {
 // rules, detecting orphan orders, and insertion into the order book.
 //
 // This function is safe for concurrent access.
-func (ob *OdrBook) MaybeAcceptOrder(order *util.Odr) (*OdrDesc, error) {
+func (ob *OdrBook) MaybeAcceptOrder(order *chainutil.Odr) (*OdrDesc, error) {
 	// Protect concurrent access.
 	ob.mtx.Lock()
 	oD, err := ob.maybeAcceptOrder(order)
@@ -503,7 +503,7 @@ func (ob *OdrBook) MaybeAcceptOrder(order *util.Odr) (*OdrDesc, error) {
 // the passed one being accepted.
 //
 // This function is safe for concurrent access.
-func (ob *OdrBook) ProcessOrder(order *util.Odr) (*OdrDesc, error) {
+func (ob *OdrBook) ProcessOrder(order *chainutil.Odr) (*OdrDesc, error) {
 	log.Tracef("Processing order %v", order.Hash())
 
 	// Protect concurrent access.

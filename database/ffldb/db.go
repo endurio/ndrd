@@ -22,9 +22,9 @@ import (
 	"github.com/btcsuite/goleveldb/leveldb/opt"
 	ldbutil "github.com/btcsuite/goleveldb/leveldb/util"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
+	"github.com/endurio/ndrd/chainutil"
 	"github.com/endurio/ndrd/database"
 	"github.com/endurio/ndrd/database/internal/treap"
-	"github.com/endurio/ndrd/util"
 	"github.com/endurio/ndrd/wire"
 )
 
@@ -1148,7 +1148,7 @@ func (tx *transaction) hasBlock(hash *chainhash.Hash) bool {
 //   - ErrTxClosed if the transaction has already been closed
 //
 // This function is part of the database.Tx interface implementation.
-func (tx *transaction) StoreBlock(block *util.Block) error {
+func (tx *transaction) StoreBlock(block *chainutil.Block) error {
 	// Ensure transaction state is valid.
 	if err := tx.checkClosed(); err != nil {
 		return err

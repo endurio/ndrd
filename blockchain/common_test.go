@@ -20,7 +20,7 @@ import (
 	_ "github.com/endurio/ndrd/database/ffldb"
 	"github.com/endurio/ndrd/txscript"
 	"github.com/endurio/ndrd/wire"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 )
 
 const (
@@ -59,8 +59,8 @@ func isSupportedDbType(dbType string) bool {
 
 // loadBlocks reads files containing bitcoin block data (gzipped but otherwise
 // in the format bitcoind writes) from disk and returns them as an array of
-// util.Block.  This is largely borrowed from the test code in btcdb.
-func loadBlocks(filename string) (blocks []*util.Block, err error) {
+// chainutil.Block.  This is largely borrowed from the test code in btcdb.
+func loadBlocks(filename string) (blocks []*chainutil.Block, err error) {
 	filename = filepath.Join("testdata/", filename)
 
 	var network = wire.MainNet
@@ -79,7 +79,7 @@ func loadBlocks(filename string) (blocks []*util.Block, err error) {
 	}
 	defer fi.Close()
 
-	var block *util.Block
+	var block *chainutil.Block
 
 	err = nil
 	for height := int64(1); err == nil; height++ {
@@ -105,7 +105,7 @@ func loadBlocks(filename string) (blocks []*util.Block, err error) {
 		// read block
 		dr.Read(rbytes)
 
-		block, err = util.NewBlockFromBytes(rbytes)
+		block, err = chainutil.NewBlockFromBytes(rbytes)
 		if err != nil {
 			return
 		}

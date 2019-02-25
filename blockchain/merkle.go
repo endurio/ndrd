@@ -11,7 +11,7 @@ import (
 
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/txscript"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 )
 
 const (
@@ -101,7 +101,7 @@ func HashMerkleBranches(left *chainhash.Hash, right *chainhash.Hash) *chainhash.
 // using witness transaction id's rather than regular transaction id's. This
 // also presents an additional case wherein the wtxid of the coinbase transaction
 // is the zeroHash.
-func BuildMerkleTreeStore(transactions []*util.Tx, witness bool) []*chainhash.Hash {
+func BuildMerkleTreeStore(transactions []*chainutil.Tx, witness bool) []*chainhash.Hash {
 	// Calculate how many entries are required to hold the binary merkle
 	// tree as a linear array and create an array of that size.
 	nextPoT := nextPowerOfTwo(len(transactions))
@@ -160,7 +160,7 @@ func BuildMerkleTreeStore(transactions []*util.Tx, witness bool) []*chainhash.Ha
 // boolean indicating if the witness root was located within any of the txOut's
 // in the passed transaction. The witness commitment is stored as the data push
 // for an OP_RETURN with special magic bytes to aide in location.
-func ExtractWitnessCommitment(tx *util.Tx) ([]byte, bool) {
+func ExtractWitnessCommitment(tx *chainutil.Tx) ([]byte, bool) {
 	// The witness commitment *must* be located within one of the coinbase
 	// transaction's outputs.
 	if !IsCoinBase(tx) {
@@ -191,7 +191,7 @@ func ExtractWitnessCommitment(tx *util.Tx) ([]byte, bool) {
 
 // ValidateWitnessCommitment validates the witness commitment (if any) found
 // within the coinbase transaction of the passed block.
-func ValidateWitnessCommitment(blk *util.Block) error {
+func ValidateWitnessCommitment(blk *chainutil.Block) error {
 	// If the block doesn't have any transactions at all, then we won't be
 	// able to extract a commitment from the non-existent coinbase
 	// transaction. So we exit early here.

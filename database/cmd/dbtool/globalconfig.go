@@ -14,11 +14,11 @@ import (
 	"github.com/endurio/ndrd/database"
 	_ "github.com/endurio/ndrd/database/ffldb"
 	"github.com/endurio/ndrd/wire"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 )
 
 var (
-	btcdHomeDir     = util.AppDataDir("ndrd", false)
+	btcdHomeDir     = chainutil.AppDataDir("ndrd", false)
 	knownDbTypes    = database.SupportedDrivers()
 	activeNetParams = &chaincfg.MainNetParams
 

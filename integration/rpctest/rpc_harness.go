@@ -19,7 +19,7 @@ import (
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/rpcclient"
 	"github.com/endurio/ndrd/wire"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 )
 
 const (
@@ -171,7 +171,7 @@ func New(activeNet *chaincfg.Params, handlers *rpcclient.NotificationHandlers,
 	// callback.
 	if handlers.OnFilteredBlockConnected != nil {
 		obc := handlers.OnFilteredBlockConnected
-		handlers.OnFilteredBlockConnected = func(height int32, header *wire.BlockHeader, filteredTxns []*util.Tx) {
+		handlers.OnFilteredBlockConnected = func(height int32, header *wire.BlockHeader, filteredTxns []*chainutil.Tx) {
 			wallet.IngestBlock(height, header, filteredTxns)
 			obc(height, header, filteredTxns)
 		}
@@ -227,7 +227,7 @@ func (h *Harness) SetUp(createTestChain bool, numMatureOutputs uint32) error {
 
 	// Filter transactions that pay to the coinbase associated with the
 	// wallet.
-	filterAddrs := []util.Address{h.wallet.coinbaseAddr}
+	filterAddrs := []chainutil.Address{h.wallet.coinbaseAddr}
 	if err := h.Node.LoadTxFilter(true, filterAddrs, nil); err != nil {
 		return err
 	}
@@ -333,7 +333,7 @@ func (h *Harness) connectRPCClient() error {
 // wallet.
 //
 // This function is safe for concurrent access.
-func (h *Harness) NewAddress() (util.Address, error) {
+func (h *Harness) NewAddress() (chainutil.Address, error) {
 	return h.wallet.NewAddress()
 }
 
@@ -341,7 +341,7 @@ func (h *Harness) NewAddress() (util.Address, error) {
 // wallet.
 //
 // This function is safe for concurrent access.
-func (h *Harness) ConfirmedBalance() util.Amount {
+func (h *Harness) ConfirmedBalance() chainutil.Amount {
 	return h.wallet.ConfirmedBalance()
 }
 
@@ -351,7 +351,7 @@ func (h *Harness) ConfirmedBalance() util.Amount {
 //
 // This function is safe for concurrent access.
 func (h *Harness) SendOutputs(targetOutputs []*wire.TxOut,
-	feeRate util.Amount) (*chainhash.Hash, error) {
+	feeRate chainutil.Amount) (*chainhash.Hash, error) {
 
 	return h.wallet.SendOutputs(targetOutputs, feeRate)
 }
@@ -362,7 +362,7 @@ func (h *Harness) SendOutputs(targetOutputs []*wire.TxOut,
 //
 // This function is safe for concurrent access.
 func (h *Harness) SendOutputsWithoutChange(targetOutputs []*wire.TxOut,
-	feeRate util.Amount) (*chainhash.Hash, error) {
+	feeRate chainutil.Amount) (*chainhash.Hash, error) {
 
 	return h.wallet.SendOutputsWithoutChange(targetOutputs, feeRate)
 }
@@ -379,7 +379,7 @@ func (h *Harness) SendOutputsWithoutChange(targetOutputs []*wire.TxOut,
 //
 // This function is safe for concurrent access.
 func (h *Harness) CreateTransaction(targetOutputs []*wire.TxOut,
-	feeRate util.Amount, change bool) (*wire.MsgTx, error) {
+	feeRate chainutil.Amount, change bool) (*wire.MsgTx, error) {
 
 	return h.wallet.CreateTransaction(targetOutputs, feeRate, change)
 }
@@ -416,8 +416,8 @@ func (h *Harness) P2PAddress() string {
 // blockTime parameter if one doesn't wish to set a custom time.
 //
 // This function is safe for concurrent access.
-func (h *Harness) GenerateAndSubmitBlock(txns []*util.Tx, blockVersion int32,
-	blockTime time.Time) (*util.Block, error) {
+func (h *Harness) GenerateAndSubmitBlock(txns []*chainutil.Tx, blockVersion int32,
+	blockTime time.Time) (*chainutil.Block, error) {
 	return h.GenerateAndSubmitBlockWithCustomCoinbaseOutputs(txns,
 		blockVersion, blockTime, []wire.TxOut{})
 }
@@ -437,8 +437,8 @@ func (h *Harness) GenerateAndSubmitBlock(txns []*util.Tx, blockVersion int32,
 //
 // This function is safe for concurrent access.
 func (h *Harness) GenerateAndSubmitBlockWithCustomCoinbaseOutputs(
-	txns []*util.Tx, blockVersion int32, blockTime time.Time,
-	mineTo []wire.TxOut) (*util.Block, error) {
+	txns []*chainutil.Tx, blockVersion int32, blockTime time.Time,
+	mineTo []wire.TxOut) (*chainutil.Block, error) {
 
 	h.Lock()
 	defer h.Unlock()
@@ -455,7 +455,7 @@ func (h *Harness) GenerateAndSubmitBlockWithCustomCoinbaseOutputs(
 	if err != nil {
 		return nil, err
 	}
-	prevBlock := util.NewBlock(mBlock)
+	prevBlock := chainutil.NewBlock(mBlock)
 	prevBlock.SetHeight(prevBlockHeight)
 
 	// Create a new block including the specified transactions

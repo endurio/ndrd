@@ -36,8 +36,8 @@ import (
 	"github.com/endurio/ndrd/peer"
 	"github.com/endurio/ndrd/txscript"
 	"github.com/endurio/ndrd/wire"
-	"github.com/endurio/ndrd/util"
-	"github.com/endurio/ndrd/util/bloom"
+	"github.com/endurio/ndrd/chainutil"
+	"github.com/endurio/ndrd/chainutil/bloom"
 )
 
 const (
@@ -578,9 +578,9 @@ func (sp *serverPeer) OnTx(_ *peer.Peer, msg *wire.MsgTx) {
 	}
 
 	// Add the transaction to the known inventory for the peer.
-	// Convert the raw MsgTx to a util.Tx which provides some convenience
+	// Convert the raw MsgTx to a chainutil.Tx which provides some convenience
 	// methods and things such as hash caching.
-	tx := util.NewTx(msg)
+	tx := chainutil.NewTx(msg)
 	iv := wire.NewInvVect(wire.InvTypeTx, tx.Hash())
 	sp.AddKnownInventory(iv)
 
@@ -653,9 +653,9 @@ func (sp *serverPeer) OnOdr(_ *peer.Peer, msg *wire.MsgOdr) {
 	}
 
 	// Add the order to the known inventory for the peer.
-	// Convert the raw MsgOdr to a util.Odr which provides some convenience
+	// Convert the raw MsgOdr to a chainutil.Odr which provides some convenience
 	// methods and things such as hash caching.
-	order := util.NewOdr(msg)
+	order := chainutil.NewOdr(msg)
 	iv := wire.NewInvVect(wire.InvTypeOdr, order.Hash())
 	sp.AddKnownInventory(iv)
 
@@ -671,9 +671,9 @@ func (sp *serverPeer) OnOdr(_ *peer.Peer, msg *wire.MsgOdr) {
 // OnBlock is invoked when a peer receives a block bitcoin message.  It
 // blocks until the bitcoin block has been fully processed.
 func (sp *serverPeer) OnBlock(_ *peer.Peer, msg *wire.MsgBlock, buf []byte) {
-	// Convert the raw MsgBlock to a util.Block which provides some
+	// Convert the raw MsgBlock to a chainutil.Block which provides some
 	// convenience methods and things such as hash caching.
-	block := util.NewBlockFromBlockAndBytes(msg, buf)
+	block := chainutil.NewBlockFromBlockAndBytes(msg, buf)
 
 	// Add the block to the known inventory for the peer.
 	iv := wire.NewInvVect(wire.InvTypeBlock, block.Hash())
@@ -1264,9 +1264,9 @@ func (sp *serverPeer) enforceNodeBloomFlag(cmd string) bool {
 // disconnected if an invalid fee filter value is provided.
 func (sp *serverPeer) OnFeeFilter(_ *peer.Peer, msg *wire.MsgFeeFilter) {
 	// Check that the passed minimum fee is a valid amount.
-	if msg.MinFee < 0 || msg.MinFee > util.MaxSatoshi {
+	if msg.MinFee < 0 || msg.MinFee > chainutil.MaxSatoshi {
 		peerLog.Debugf("Peer %v sent an invalid feefilter '%v' -- "+
-			"disconnecting", sp, util.Amount(msg.MinFee))
+			"disconnecting", sp, chainutil.Amount(msg.MinFee))
 		sp.Disconnect()
 		return
 	}
@@ -1523,7 +1523,7 @@ func (s *server) AnnounceNewOrders(orders []*mempool.OdrDesc) {
 
 // Transaction has one confirmation on the main chain. Now we can mark it as no
 // longer needing rebroadcasting.
-func (s *server) TransactionConfirmed(tx *util.Tx) {
+func (s *server) TransactionConfirmed(tx *chainutil.Tx) {
 	// Rebroadcasting is only necessary when the RPC server is active.
 	if s.rpcServer == nil {
 		return
@@ -1535,7 +1535,7 @@ func (s *server) TransactionConfirmed(tx *util.Tx) {
 
 // Order has been filled with one confirmation on the main chain.
 // Now we can mark it as no longer needing rebroadcasting.
-func (s *server) OrderFilled(order *util.Odr) {
+func (s *server) OrderFilled(order *chainutil.Odr) {
 	// Rebroadcasting is only necessary when the RPC server is active.
 	if s.rpcServer == nil {
 		return
@@ -2901,7 +2901,7 @@ func newServer(listenAddrs []string, db database.DB, chainParams *chaincfg.Param
 		FetchUtxoView:  s.chain.FetchUtxoView,
 		BestHeight:     func() int32 { return s.chain.BestSnapshot().Height },
 		MedianTimePast: func() time.Time { return s.chain.BestSnapshot().MedianTime },
-		CalcSequenceLock: func(tx *util.Tx, view *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error) {
+		CalcSequenceLock: func(tx *chainutil.Tx, view *blockchain.UtxoViewpoint) (*blockchain.SequenceLock, error) {
 			return s.chain.CalcSequenceLock(tx, view, true)
 		},
 		IsDeploymentActive: s.chain.IsDeploymentActive,

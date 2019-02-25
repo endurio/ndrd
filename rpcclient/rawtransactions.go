@@ -12,7 +12,7 @@ import (
 	"github.com/endurio/ndrd/chainjson"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/wire"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 )
 
 // SigHashType enumerates the available signature hashing types that the
@@ -64,7 +64,7 @@ type FutureGetRawTransactionResult chan *response
 
 // Receive waits for the response promised by the future and returns a
 // transaction given its hash.
-func (r FutureGetRawTransactionResult) Receive() (*util.Tx, error) {
+func (r FutureGetRawTransactionResult) Receive() (*chainutil.Tx, error) {
 	res, err := receiveFuture(r)
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func (r FutureGetRawTransactionResult) Receive() (*util.Tx, error) {
 	if err := msgTx.Deserialize(bytes.NewReader(serializedTx)); err != nil {
 		return nil, err
 	}
-	return util.NewTx(&msgTx), nil
+	return chainutil.NewTx(&msgTx), nil
 }
 
 // GetRawTransactionAsync returns an instance of a type that can be used to get
@@ -110,7 +110,7 @@ func (c *Client) GetRawTransactionAsync(txHash *chainhash.Hash) FutureGetRawTran
 //
 // See GetRawTransactionVerbose to obtain additional information about the
 // transaction.
-func (c *Client) GetRawTransaction(txHash *chainhash.Hash) (*util.Tx, error) {
+func (c *Client) GetRawTransaction(txHash *chainhash.Hash) (*chainutil.Tx, error) {
 	return c.GetRawTransactionAsync(txHash).Receive()
 }
 
@@ -239,7 +239,7 @@ func (r FutureCreateRawTransactionResult) Receive() (*wire.MsgTx, error) {
 //
 // See CreateRawTransaction for the blocking version and more details.
 func (c *Client) CreateRawTransactionAsync(inputs []chainjson.TransactionInput,
-	amounts map[util.Address]util.Amount, lockTime *int64) FutureCreateRawTransactionResult {
+	amounts map[chainutil.Address]chainutil.Amount, lockTime *int64) FutureCreateRawTransactionResult {
 
 	convertedAmts := make(map[string]float64, len(amounts))
 	for addr, amount := range amounts {
@@ -252,7 +252,7 @@ func (c *Client) CreateRawTransactionAsync(inputs []chainjson.TransactionInput,
 // CreateRawTransaction returns a new transaction spending the provided inputs
 // and sending to the provided addresses.
 func (c *Client) CreateRawTransaction(inputs []chainjson.TransactionInput,
-	amounts map[util.Address]util.Amount, lockTime *int64) (*wire.MsgTx, error) {
+	amounts map[chainutil.Address]chainutil.Amount, lockTime *int64) (*wire.MsgTx, error) {
 
 	return c.CreateRawTransactionAsync(inputs, amounts, lockTime).Receive()
 }
@@ -599,7 +599,7 @@ func (r FutureSearchRawTransactionsResult) Receive() ([]*wire.MsgTx, error) {
 // function on the returned instance.
 //
 // See SearchRawTransactions for the blocking version and more details.
-func (c *Client) SearchRawTransactionsAsync(address util.Address, skip, count int, reverse bool, filterAddrs []string) FutureSearchRawTransactionsResult {
+func (c *Client) SearchRawTransactionsAsync(address chainutil.Address, skip, count int, reverse bool, filterAddrs []string) FutureSearchRawTransactionsResult {
 	addr := address.EncodeAddress()
 	verbose := chainjson.Int(0)
 	cmd := chainjson.NewSearchRawTransactionsCmd(addr, verbose, &skip, &count,
@@ -614,7 +614,7 @@ func (c *Client) SearchRawTransactionsAsync(address util.Address, skip, count in
 //
 // See SearchRawTransactionsVerbose to retrieve a list of data structures with
 // information about the transactions instead of the transactions themselves.
-func (c *Client) SearchRawTransactions(address util.Address, skip, count int, reverse bool, filterAddrs []string) ([]*wire.MsgTx, error) {
+func (c *Client) SearchRawTransactions(address chainutil.Address, skip, count int, reverse bool, filterAddrs []string) ([]*wire.MsgTx, error) {
 	return c.SearchRawTransactionsAsync(address, skip, count, reverse, filterAddrs).Receive()
 }
 
@@ -646,7 +646,7 @@ func (r FutureSearchRawTransactionsVerboseResult) Receive() ([]*chainjson.Search
 // function on the returned instance.
 //
 // See SearchRawTransactionsVerbose for the blocking version and more details.
-func (c *Client) SearchRawTransactionsVerboseAsync(address util.Address, skip,
+func (c *Client) SearchRawTransactionsVerboseAsync(address chainutil.Address, skip,
 	count int, includePrevOut, reverse bool, filterAddrs *[]string) FutureSearchRawTransactionsVerboseResult {
 
 	addr := address.EncodeAddress()
@@ -667,7 +667,7 @@ func (c *Client) SearchRawTransactionsVerboseAsync(address util.Address, skip,
 // specifically been enabled.
 //
 // See SearchRawTransactions to retrieve a list of raw transactions instead.
-func (c *Client) SearchRawTransactionsVerbose(address util.Address, skip,
+func (c *Client) SearchRawTransactionsVerbose(address chainutil.Address, skip,
 	count int, includePrevOut, reverse bool, filterAddrs []string) ([]*chainjson.SearchRawTransactionsResult, error) {
 
 	return c.SearchRawTransactionsVerboseAsync(address, skip, count,

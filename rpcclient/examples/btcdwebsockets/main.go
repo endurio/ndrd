@@ -12,7 +12,7 @@ import (
 
 	"github.com/endurio/ndrd/rpcclient"
 	"github.com/endurio/ndrd/wire"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 )
 
 func main() {
@@ -21,7 +21,7 @@ func main() {
 	// for notifications.  See the documentation of the rpcclient
 	// NotificationHandlers type for more details about each handler.
 	ntfnHandlers := rpcclient.NotificationHandlers{
-		OnFilteredBlockConnected: func(height int32, header *wire.BlockHeader, txns []*util.Tx) {
+		OnFilteredBlockConnected: func(height int32, header *wire.BlockHeader, txns []*chainutil.Tx) {
 			log.Printf("Block connected: %v (%d) %v",
 				header.BlockHash(), height, header.Timestamp)
 		},
@@ -32,7 +32,7 @@ func main() {
 	}
 
 	// Connect to local ndrd RPC server using websockets.
-	btcdHomeDir := util.AppDataDir("ndrd", false)
+	btcdHomeDir := chainutil.AppDataDir("ndrd", false)
 	certs, err := ioutil.ReadFile(filepath.Join(btcdHomeDir, "rpc.cert"))
 	if err != nil {
 		log.Fatal(err)

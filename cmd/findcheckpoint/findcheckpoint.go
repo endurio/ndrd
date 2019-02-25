@@ -149,7 +149,7 @@ func main() {
 	defer db.Close()
 
 	// Setup chain.  Ignore notifications since they aren't needed for this
-	// util.
+	// chainutil.
 	chain, err := blockchain.New(&blockchain.Config{
 		DB:          db,
 		ChainParams: activeNetParams,

@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 	"github.com/endurio/ndrd/chaincfg"
 )
 
@@ -45,7 +45,7 @@ func main() {
 
 	// Create and print new payment address, specific to the active network.
 	pubKeyHash := make([]byte, 20)
-	addr, err := util.NewAddressPubKeyHash(pubKeyHash, chainParams)
+	addr, err := chainutil.NewAddressPubKeyHash(pubKeyHash, chainParams)
 	if err != nil {
 		log.Fatal(err)
 	}

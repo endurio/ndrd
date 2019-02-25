@@ -15,7 +15,7 @@ import (
 	"github.com/endurio/ndrd/chainjson"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/wire"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 )
 
 // FutureDebugLevelResult is a future promise to deliver the result of a
@@ -128,7 +128,7 @@ func (r FutureListAddressTransactionsResult) Receive() ([]chainjson.ListTransact
 // See ListAddressTransactions for the blocking version and more details.
 //
 // NOTE: This is a ndrd extension.
-func (c *Client) ListAddressTransactionsAsync(addresses []util.Address, account string) FutureListAddressTransactionsResult {
+func (c *Client) ListAddressTransactionsAsync(addresses []chainutil.Address, account string) FutureListAddressTransactionsResult {
 	// Convert addresses to strings.
 	addrs := make([]string, 0, len(addresses))
 	for _, addr := range addresses {
@@ -142,7 +142,7 @@ func (c *Client) ListAddressTransactionsAsync(addresses []util.Address, account 
 // with the provided addresses.
 //
 // NOTE: This is a btcwallet extension.
-func (c *Client) ListAddressTransactions(addresses []util.Address, account string) ([]chainjson.ListTransactionsResult, error) {
+func (c *Client) ListAddressTransactions(addresses []chainutil.Address, account string) ([]chainjson.ListTransactionsResult, error) {
 	return c.ListAddressTransactionsAsync(addresses, account).Receive()
 }
 

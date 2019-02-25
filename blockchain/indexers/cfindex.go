@@ -12,9 +12,9 @@ import (
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/database"
 	"github.com/endurio/ndrd/wire"
-	"github.com/endurio/ndrd/util"
-	"github.com/endurio/ndrd/util/gcs"
-	"github.com/endurio/ndrd/util/gcs/builder"
+	"github.com/endurio/ndrd/chainutil"
+	"github.com/endurio/ndrd/chainutil/gcs"
+	"github.com/endurio/ndrd/chainutil/gcs/builder"
 )
 
 const (
@@ -149,7 +149,7 @@ func (idx *CfIndex) Create(dbTx database.Tx) error {
 
 // storeFilter stores a given filter, and performs the steps needed to
 // generate the filter's header.
-func storeFilter(dbTx database.Tx, block *util.Block, f *gcs.Filter,
+func storeFilter(dbTx database.Tx, block *chainutil.Block, f *gcs.Filter,
 	filterType wire.FilterType) error {
 	if uint8(filterType) > maxFilterType {
 		return errors.New("unsupported filter type")
@@ -209,7 +209,7 @@ func storeFilter(dbTx database.Tx, block *util.Block, f *gcs.Filter,
 // ConnectBlock is invoked by the index manager when a new block has been
 // connected to the main chain. This indexer adds a hash-to-cf mapping for
 // every passed block. This is part of the Indexer interface.
-func (idx *CfIndex) ConnectBlock(dbTx database.Tx, block *util.Block,
+func (idx *CfIndex) ConnectBlock(dbTx database.Tx, block *chainutil.Block,
 	stxos []blockchain.SpentTxOut) error {
 
 	prevScripts := make([][]byte, len(stxos))
@@ -228,7 +228,7 @@ func (idx *CfIndex) ConnectBlock(dbTx database.Tx, block *util.Block,
 // DisconnectBlock is invoked by the index manager when a block has been
 // disconnected from the main chain.  This indexer removes the hash-to-cf
 // mapping for every passed block. This is part of the Indexer interface.
-func (idx *CfIndex) DisconnectBlock(dbTx database.Tx, block *util.Block,
+func (idx *CfIndex) DisconnectBlock(dbTx database.Tx, block *chainutil.Block,
 	_ []blockchain.SpentTxOut) error {
 
 	for _, key := range cfIndexKeys {

@@ -16,7 +16,7 @@ import (
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/txscript"
 	"github.com/endurio/ndrd/wire"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 )
 
 // solveBlock attempts to find a nonce which makes the passed block header hash
@@ -96,8 +96,8 @@ func standardCoinbaseScript(nextBlockHeight int32, extraNonce uint64) ([]byte, e
 // createCoinbaseTx returns a coinbase transaction paying an appropriate
 // subsidy based on the passed block height to the provided address.
 func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int32,
-	addr util.Address, mineTo []wire.TxOut,
-	net *chaincfg.Params) (*util.Tx, error) {
+	addr chainutil.Address, mineTo []wire.TxOut,
+	net *chaincfg.Params) (*chainutil.Tx, error) {
 
 	// Create the script to pay to the provided payment address.
 	pkScript, err := txscript.PayToAddrScript(addr)
@@ -124,7 +124,7 @@ func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int32,
 			tx.AddTxOut(&mineTo[i])
 		}
 	}
-	return util.NewTx(tx), nil
+	return chainutil.NewTx(tx), nil
 }
 
 // CreateBlock creates a new block building from the previous block with a
@@ -132,9 +132,9 @@ func createCoinbaseTx(coinbaseScript []byte, nextBlockHeight int32,
 // initialized), then the timestamp of the previous block will be used plus 1
 // second is used. Passing nil for the previous block results in a block that
 // builds off of the genesis block for the specified chain.
-func CreateBlock(prevBlock *util.Block, inclusionTxs []*util.Tx,
-	blockVersion int32, blockTime time.Time, miningAddr util.Address,
-	mineTo []wire.TxOut, net *chaincfg.Params) (*util.Block, error) {
+func CreateBlock(prevBlock *chainutil.Block, inclusionTxs []*chainutil.Tx,
+	blockVersion int32, blockTime time.Time, miningAddr chainutil.Address,
+	mineTo []wire.TxOut, net *chaincfg.Params) (*chainutil.Block, error) {
 
 	var (
 		prevHash      *chainhash.Hash
@@ -177,7 +177,7 @@ func CreateBlock(prevBlock *util.Block, inclusionTxs []*util.Tx,
 	}
 
 	// Create a new block ready to be solved.
-	blockTxns := []*util.Tx{coinbaseTx}
+	blockTxns := []*chainutil.Tx{coinbaseTx}
 	if inclusionTxs != nil {
 		blockTxns = append(blockTxns, inclusionTxs...)
 	}
@@ -201,7 +201,7 @@ func CreateBlock(prevBlock *util.Block, inclusionTxs []*util.Tx,
 		return nil, errors.New("Unable to solve block")
 	}
 
-	utilBlock := util.NewBlock(&block)
+	utilBlock := chainutil.NewBlock(&block)
 	utilBlock.SetHeight(blockHeight)
 	return utilBlock, nil
 }

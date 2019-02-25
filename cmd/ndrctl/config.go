@@ -14,7 +14,7 @@ import (
 	"strings"
 
 	"github.com/endurio/ndrd/chainjson"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 	flags "github.com/jessevdk/go-flags"
 )
 
@@ -26,9 +26,9 @@ const (
 )
 
 var (
-	btcdHomeDir           = util.AppDataDir("ndrd", false)
-	btcctlHomeDir         = util.AppDataDir("btcctl", false)
-	btcwalletHomeDir      = util.AppDataDir("btcwallet", false)
+	btcdHomeDir           = chainutil.AppDataDir("ndrd", false)
+	btcctlHomeDir         = chainutil.AppDataDir("btcctl", false)
+	btcwalletHomeDir      = chainutil.AppDataDir("btcwallet", false)
 	defaultConfigFile     = filepath.Join(btcctlHomeDir, "btcctl.conf")
 	defaultRPCServer      = "localhost"
 	defaultRPCCertFile    = filepath.Join(btcdHomeDir, "rpc.cert")

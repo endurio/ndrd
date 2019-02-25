@@ -29,7 +29,7 @@ import (
 	_ "github.com/endurio/ndrd/database/ffldb"
 	"github.com/endurio/ndrd/mempool"
 	"github.com/endurio/ndrd/peer"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 	"github.com/btcsuite/go-socks/socks"
 	flags "github.com/jessevdk/go-flags"
 )
@@ -68,7 +68,7 @@ const (
 )
 
 var (
-	defaultHomeDir     = util.AppDataDir("ndrd", false)
+	defaultHomeDir     = chainutil.AppDataDir("ndrd", false)
 	defaultConfigFile  = filepath.Join(defaultHomeDir, defaultConfigFilename)
 	defaultDataDir     = filepath.Join(defaultHomeDir, defaultDataDirname)
 	knownDbTypes       = database.SupportedDrivers()
@@ -170,7 +170,7 @@ type config struct {
 	dial                 func(string, string, time.Duration) (net.Conn, error)
 	addCheckpoints       []chaincfg.Checkpoint
 	miningKey            *chainec.PrivateKey
-	minRelayTxFee        util.Amount
+	minRelayTxFee        chainutil.Amount
 	whitelists           []*net.IPNet
 }
 
@@ -755,7 +755,7 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Validate the the minrelaytxfee.
-	cfg.minRelayTxFee, err = util.NewAmount(cfg.MinRelayTxFee)
+	cfg.minRelayTxFee, err = chainutil.NewAmount(cfg.MinRelayTxFee)
 	if err != nil {
 		str := "%s: invalid minrelaytxfee: %v"
 		err := fmt.Errorf(str, funcName, err)
@@ -868,7 +868,7 @@ func loadConfig() (*config, []string, error) {
 
 	// Check mining addresses are valid and saved parsed versions.
 	if len(cfg.MiningKey) > 0 {
-		privWif, err := util.DecodeWIF(cfg.MiningKey)
+		privWif, err := chainutil.DecodeWIF(cfg.MiningKey)
 		if err != nil {
 			return nil, nil, err
 		}

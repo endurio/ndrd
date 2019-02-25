@@ -10,7 +10,7 @@ import (
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/mempool"
 	"github.com/endurio/ndrd/peer"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 	"github.com/endurio/ndrd/wire"
 )
 
@@ -26,9 +26,9 @@ type PeerNotifier interface {
 
 	RelayInventory(invVect *wire.InvVect, data interface{})
 
-	TransactionConfirmed(tx *util.Tx)
+	TransactionConfirmed(tx *chainutil.Tx)
 
-	OrderFilled(odr *util.Odr)
+	OrderFilled(odr *chainutil.Odr)
 }
 
 // Config is a configuration struct used to initialize a new SyncManager.

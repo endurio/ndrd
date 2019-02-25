@@ -7,7 +7,7 @@ import (
 
 	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chaincfg"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 	"github.com/endurio/ndrd/wire"
 	"golang.org/x/crypto/ripemd160"
 )
@@ -131,7 +131,7 @@ func (s PkScript) Script() []byte {
 }
 
 // Address encodes the script into an address for the given chain.
-func (s PkScript) Address(chainParams *chaincfg.Params) (util.Address, error) {
+func (s PkScript) Address(chainParams *chaincfg.Params) (chainutil.Address, error) {
 	_, addrs, _, err := ExtractPkScriptAddrs(s.Script(), chainParams)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse address: %v", err)

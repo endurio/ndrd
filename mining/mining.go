@@ -17,14 +17,14 @@ import (
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/txscript"
-	"github.com/endurio/ndrd/util"
+	"github.com/endurio/ndrd/chainutil"
 	"github.com/endurio/ndrd/wire"
 )
 
 const (
 	// MinHighPriority is the minimum priority value that allows a
 	// transaction to be considered high priority.
-	MinHighPriority = util.SatoshiPerBitcoin * 144.0 / 250
+	MinHighPriority = chainutil.SatoshiPerBitcoin * 144.0 / 250
 
 	// CoinbaseFlags is added to the coinbase script of a generated block
 	// and is used to monitor BIP16 support as well as blocks that are
@@ -42,7 +42,7 @@ var (
 // additional metadata.
 type TxDesc struct {
 	// Tx is the transaction associated with the entry.
-	Tx *util.Tx
+	Tx *chainutil.Tx
 
 	// Added is the time when the entry was added to the source pool.
 	Added time.Time
@@ -81,7 +81,7 @@ type TxSource interface {
 // additional metadata.
 type OdrDesc struct {
 	// Odr is the order associated with the entry.
-	*util.Odr
+	*chainutil.Odr
 
 	// Added is the time when the entry was added to the source pool.
 	Added time.Time
@@ -94,10 +94,10 @@ type OdrDesc struct {
 	Bid bool
 
 	// Amount is the total NDR will be bought or sold by the order.
-	Amount util.Amount
+	Amount chainutil.Amount
 
 	// Payout is the total STB will be spent by the order associated with the entry.
-	Payout util.Amount
+	Payout chainutil.Amount
 }
 
 // OdrSource represents a source of orders to consider for inclusion in
@@ -125,7 +125,7 @@ type OdrSource interface {
 // transaction to be prioritized and track dependencies on other transactions
 // which have not been mined into a block yet.
 type txPrioItem struct {
-	tx       *util.Tx
+	tx       *chainutil.Tx
 	fee      int64
 	priority float64
 	feePerKB int64
@@ -269,9 +269,9 @@ type BlockTemplate struct {
 }
 
 // Address returns the mining address for mining private key and chain params
-func Address(key *chainec.PrivateKey, chainParams *chaincfg.Params) util.Address {
+func Address(key *chainec.PrivateKey, chainParams *chaincfg.Params) chainutil.Address {
 	serializedPK := key.PubKey().SerializeCompressed()
-	address, err := util.NewAddressPubKey(serializedPK, chainParams)
+	address, err := chainutil.NewAddressPubKey(serializedPK, chainParams)
 	if err != nil {
 		// should not happen
 		return nil
@@ -310,7 +310,7 @@ func standardCoinbaseScript(nextBlockHeight int32, extraNonce uint64) ([]byte, e
 //
 // See the comment for NewBlockTemplate for more information about why the nil
 // address handling is useful.
-func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockHeight int32, addr util.Address) (*util.Tx, error) {
+func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockHeight int32, addr chainutil.Address) (*chainutil.Tx, error) {
 	// Create the script to pay to the provided payment address if one was
 	// specified.  Otherwise create a script that allows the coinbase to be
 	// redeemable by anyone.
@@ -342,13 +342,13 @@ func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockH
 	// Block reward is paid using NDR
 	tx.AddTxOut(wire.NewTxOutToken(blockchain.CalcBlockSubsidy(nextBlockHeight, params),
 		pkScript, wire.NDR))
-	return util.NewTx(tx), nil
+	return chainutil.NewTx(tx), nil
 }
 
 // spendTransaction updates the passed view by marking the inputs to the passed
 // transaction as spent.  It also adds all outputs in the passed transaction
 // which are not provably unspendable as available unspent transaction outputs.
-func spendTransaction(utxoView *blockchain.UtxoViewpoint, tx *util.Tx, height int32) error {
+func spendTransaction(utxoView *blockchain.UtxoViewpoint, tx *chainutil.Tx, height int32) error {
 	for _, txIn := range tx.MsgTx().TxIn {
 		entry := utxoView.LookupEntry(txIn.PreviousOutPoint)
 		if entry != nil {
@@ -362,7 +362,7 @@ func spendTransaction(utxoView *blockchain.UtxoViewpoint, tx *util.Tx, height in
 
 // logSkippedDeps logs any dependencies which are also skipped as a result of
 // skipping a transaction while generating a block template at the trace level.
-func logSkippedDeps(tx *util.Tx, deps map[chainhash.Hash]*txPrioItem) {
+func logSkippedDeps(tx *chainutil.Tx, deps map[chainhash.Hash]*txPrioItem) {
 	if deps == nil {
 		return
 	}
@@ -505,7 +505,7 @@ func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 //  |  transactions (while block size   |   |
 //  |  <= policy.BlockMinSize)          |   |
 //   -----------------------------------  --
-func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress util.Address) (*BlockTemplate, error) {
+func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress chainutil.Address) (*BlockTemplate, error) {
 	// Extend the most recently known best block.
 	best := g.chain.BestSnapshot()
 	nextBlockHeight := best.Height + 1
@@ -557,7 +557,7 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress util.Address) (*BlockTe
 	// generated block with reserved space.  Also create a utxo view to
 	// house all of the input transactions so multiple lookups can be
 	// avoided.
-	blockTxns := make([]*util.Tx, 0, queueLen)
+	blockTxns := make([]*chainutil.Tx, 0, queueLen)
 	blockTxns = append(blockTxns, coinbaseTx)
 	blockUtxos := blockchain.NewUtxoViewpoint()
 
@@ -728,7 +728,7 @@ mempoolLoop:
 			// Therefore, we account for the additional weight
 			// within the block with a model coinbase tx with a
 			// witness commitment.
-			coinbaseCopy := util.NewTx(coinbaseTx.MsgTx().Copy())
+			coinbaseCopy := chainutil.NewTx(coinbaseTx.MsgTx().Copy())
 			coinbaseCopy.MsgTx().TxIn[0].Witness = [][]byte{
 				bytes.Repeat([]byte("a"),
 					blockchain.CoinbaseWitnessDataLen),
@@ -996,7 +996,7 @@ mempoolLoop:
 	// Finally, perform a full check on the created block against the chain
 	// consensus rules to ensure it properly connects to the current best
 	// chain with no issues.
-	block := util.NewBlock(&msgBlock)
+	block := chainutil.NewBlock(&msgBlock)
 	block.SetHeight(nextBlockHeight)
 	if err := g.chain.CheckConnectBlockTemplate(block, g.chainParams); err != nil {
 		return nil, err
@@ -1146,12 +1146,12 @@ func (g *BlkTmplGenerator) UpdateExtraNonce(msgBlock *wire.MsgBlock, blockHeight
 	}
 	msgBlock.Transactions[0].TxIn[0].SignatureScript = coinbaseScript
 
-	// TODO(davec): A util.Block should use saved in the state to avoid
+	// TODO(davec): A chainutil.Block should use saved in the state to avoid
 	// recalculating all of the other transaction hashes.
 	// block.Transactions[0].InvalidateCache()
 
 	// Recalculate the merkle root with the updated extra nonce.
-	block := util.NewBlock(msgBlock)
+	block := chainutil.NewBlock(msgBlock)
 	merkles := blockchain.BuildMerkleTreeStore(block.Transactions(), false)
 	msgBlock.Header.MerkleRoot = *merkles[len(merkles)-1]
 	return nil
