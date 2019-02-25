@@ -25,7 +25,7 @@ import (
 
 	"github.com/btcsuite/go-socks/socks"
 	"github.com/btcsuite/websocket"
-	"github.com/endurio/ndrd/btcjson"
+	"github.com/endurio/ndrd/chainjson"
 )
 
 var (
@@ -238,10 +238,10 @@ func (c *Client) trackRegisteredNtfns(cmd interface{}) {
 	defer c.ntfnStateLock.Unlock()
 
 	switch bcmd := cmd.(type) {
-	case *btcjson.NotifyBlocksCmd:
+	case *chainjson.NotifyBlocksCmd:
 		c.ntfnState.notifyBlocks = true
 
-	case *btcjson.NotifyNewTransactionsCmd:
+	case *chainjson.NotifyNewTransactionsCmd:
 		if bcmd.Verbose != nil && *bcmd.Verbose {
 			c.ntfnState.notifyNewTxVerbose = true
 		} else {
@@ -249,12 +249,12 @@ func (c *Client) trackRegisteredNtfns(cmd interface{}) {
 
 		}
 
-	case *btcjson.NotifySpentCmd:
+	case *chainjson.NotifySpentCmd:
 		for _, op := range bcmd.OutPoints {
 			c.ntfnState.notifySpent[op] = struct{}{}
 		}
 
-	case *btcjson.NotifyReceivedCmd:
+	case *chainjson.NotifyReceivedCmd:
 		for _, addr := range bcmd.Addresses {
 			c.ntfnState.notifyReceived[addr] = struct{}{}
 		}
@@ -283,7 +283,7 @@ type (
 	// to be valid (according to JSON-RPC 1.0 spec), ID may not be nil.
 	rawResponse struct {
 		Result json.RawMessage   `json:"result"`
-		Error  *btcjson.RPCError `json:"error"`
+		Error  *chainjson.RPCError `json:"error"`
 	}
 )
 
@@ -295,7 +295,7 @@ type response struct {
 }
 
 // result checks whether the unmarshaled response contains a non-nil error,
-// returning an unmarshaled btcjson.RPCError (or an unmarshaling error) if so.
+// returning an unmarshaled chainjson.RPCError (or an unmarshaling error) if so.
 // If the response is not an error, the raw bytes of the request are
 // returned for further unmashaling into specific result types.
 func (r rawResponse) result() (result []byte, err error) {
@@ -537,7 +537,7 @@ func (c *Client) reregisterNtfns() error {
 	// outpoints in one command if needed.
 	nslen := len(stateCopy.notifySpent)
 	if nslen > 0 {
-		outpoints := make([]btcjson.OutPoint, 0, nslen)
+		outpoints := make([]chainjson.OutPoint, 0, nslen)
 		for op := range stateCopy.notifySpent {
 			outpoints = append(outpoints, op)
 		}
@@ -876,14 +876,14 @@ func (c *Client) sendRequest(jReq *jsonRequest) {
 // configuration of the client.
 func (c *Client) sendCmd(cmd interface{}) chan *response {
 	// Get the method associated with the command.
-	method, err := btcjson.CmdMethod(cmd)
+	method, err := chainjson.CmdMethod(cmd)
 	if err != nil {
 		return newFutureError(err)
 	}
 
 	// Marshal the command.
 	id := c.NextID()
-	marshalledJSON, err := btcjson.MarshalCmd(id, cmd)
+	marshalledJSON, err := chainjson.MarshalCmd(id, cmd)
 	if err != nil {
 		return newFutureError(err)
 	}

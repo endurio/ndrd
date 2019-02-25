@@ -208,7 +208,7 @@ Changes in 0.11.0 (Wed May 06 2015)
       be read from stdin (#348)
     - Add generate command
   - Notable developer-related package changes:
-    - The new version 2 btcjson package has now replaced the deprecated
+    - The new version 2 chainjson package has now replaced the deprecated
       version 1 package (#368)
     - The btcec package now performs all signing using RFC6979 deterministic
       signatures (#358, #360)
@@ -337,10 +337,10 @@ Changes in 0.10.0 (Sun Mar 01 2015)
   - Notable developer-related package changes:
     - Many of the core packages have been relocated into the ndrd repository
       (https://github.com/endurio/ndrd/issues/214)
-    - A new version of the btcjson package that has been completely
+    - A new version of the chainjson package that has been completely
       redesigned from the ground up based based upon how the project has
       evolved and lessons learned while using it since it was first written
-      is now available in the btcjson/v2/btcjson directory
+      is now available in the chainjson/v2/chainjson directory
       - This will ultimately replace the current version so anyone making
         use of this package will need to update their code accordingly
     - The btcec package now provides better facilities for working directly

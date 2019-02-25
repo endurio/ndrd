@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/endurio/ndrd/blockchain"
-	"github.com/endurio/ndrd/btcjson"
+	"github.com/endurio/ndrd/chainjson"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/mining"
@@ -34,8 +34,8 @@ func (oD *OdrDesc) Price() float64 {
 }
 
 // OrderBookResult returns OrderBookResult object for the order
-func (oD *OdrDesc) OrderBookResult() *btcjson.GetOrderBookResult {
-	return &btcjson.GetOrderBookResult{
+func (oD *OdrDesc) OrderBookResult() *chainjson.GetOrderBookResult {
+	return &chainjson.GetOrderBookResult{
 		Bid:    oD.Bid,
 		Price:  oD.Price(),
 		Amount: oD.Amount.ToBTC(),
@@ -614,14 +614,14 @@ func getOrdersForPayout(orders *list.List, payout *big.Int) ([]*OdrDesc, error) 
 }
 
 // RawMembookVerbose returns all of the entries in the mempool as a fully
-// populated btcjson result.
+// populated chainjson result.
 //
 // This function is safe for concurrent access.
-func (ob *OdrBook) RawMembookVerbose() map[string]*btcjson.GetRawMembookVerboseResult {
+func (ob *OdrBook) RawMembookVerbose() map[string]*chainjson.GetRawMembookVerboseResult {
 	ob.mtx.RLock()
 	defer ob.mtx.RUnlock()
 
-	result := make(map[string]*btcjson.GetRawMembookVerboseResult,
+	result := make(map[string]*chainjson.GetRawMembookVerboseResult,
 		len(ob.book))
 
 	for _, element := range ob.book {
@@ -631,7 +631,7 @@ func (ob *OdrBook) RawMembookVerbose() map[string]*btcjson.GetRawMembookVerboseR
 		desc := element.Value.(*OdrDesc)
 		odr := desc.Odr
 
-		mpd := &btcjson.GetRawMembookVerboseResult{
+		mpd := &chainjson.GetRawMembookVerboseResult{
 			Size:    int32(odr.SerializeSize()),
 			Vsize:   int32(GetTxVirtualSize(odr.Tx)),
 			Depends: make([]string, 0),
@@ -674,17 +674,17 @@ func getOrdersForDepth(orders *list.List, depth float64) []*OdrDesc {
 }
 
 // OrderBook returns all of the entries in the order book as a fully
-// populated btcjson result.
+// populated chainjson result.
 //
 // This function is safe for concurrent access.
-func (ob *OdrBook) OrderBook(depth float64) ([]*btcjson.GetOrderBookResult, error) {
+func (ob *OdrBook) OrderBook(depth float64) ([]*chainjson.GetOrderBookResult, error) {
 	ob.mtx.RLock()
 	defer ob.mtx.RUnlock()
 
 	asks := getOrdersForDepth(ob.asks, depth)
 	bids := getOrdersForDepth(ob.bids, depth)
 
-	result := make([]*btcjson.GetOrderBookResult, len(asks)+len(bids))
+	result := make([]*chainjson.GetOrderBookResult, len(asks)+len(bids))
 
 	var idx int
 	// asks list is reverted

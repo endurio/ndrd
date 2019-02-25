@@ -14,7 +14,7 @@ import (
 
 	"github.com/endurio/ndrd/blockchain"
 	"github.com/endurio/ndrd/blockchain/indexers"
-	"github.com/endurio/ndrd/btcjson"
+	"github.com/endurio/ndrd/chainjson"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/mining"
@@ -1180,14 +1180,14 @@ func (mp *TxPool) MiningDescs() []*mining.TxDesc {
 }
 
 // RawMempoolVerbose returns all of the entries in the mempool as a fully
-// populated btcjson result.
+// populated chainjson result.
 //
 // This function is safe for concurrent access.
-func (mp *TxPool) RawMempoolVerbose() map[string]*btcjson.GetRawMempoolVerboseResult {
+func (mp *TxPool) RawMempoolVerbose() map[string]*chainjson.GetRawMempoolVerboseResult {
 	mp.mtx.RLock()
 	defer mp.mtx.RUnlock()
 
-	result := make(map[string]*btcjson.GetRawMempoolVerboseResult,
+	result := make(map[string]*chainjson.GetRawMempoolVerboseResult,
 		len(mp.pool))
 	bestHeight := mp.cfg.BestHeight()
 
@@ -1203,7 +1203,7 @@ func (mp *TxPool) RawMempoolVerbose() map[string]*btcjson.GetRawMempoolVerboseRe
 				bestHeight+1)
 		}
 
-		mpd := &btcjson.GetRawMempoolVerboseResult{
+		mpd := &chainjson.GetRawMempoolVerboseResult{
 			Size:             int32(tx.MsgTx().SerializeSize()),
 			Vsize:            int32(GetTxVirtualSize(tx)),
 			Fee:              util.Amount(desc.Fee).ToBTC(),

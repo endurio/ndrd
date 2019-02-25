@@ -24,7 +24,7 @@ import (
 
 	"github.com/btcsuite/websocket"
 	"github.com/endurio/ndrd/blockchain"
-	"github.com/endurio/ndrd/btcjson"
+	"github.com/endurio/ndrd/chainjson"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/database"
@@ -730,9 +730,9 @@ func (*wsNotificationManager) notifyBlockConnected(clients map[chan struct{}]*ws
 	block *util.Block) {
 
 	// Notify interested websocket clients about the connected block.
-	ntfn := btcjson.NewBlockConnectedNtfn(block.Hash().String(), block.Height(),
+	ntfn := chainjson.NewBlockConnectedNtfn(block.Hash().String(), block.Height(),
 		block.MsgBlock().Header.Timestamp.Unix())
-	marshalledJSON, err := btcjson.MarshalCmd(nil, ntfn)
+	marshalledJSON, err := chainjson.MarshalCmd(nil, ntfn)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal block connected notification: "+
 			"%v", err)
@@ -754,9 +754,9 @@ func (*wsNotificationManager) notifyBlockDisconnected(clients map[chan struct{}]
 	}
 
 	// Notify interested websocket clients about the disconnected block.
-	ntfn := btcjson.NewBlockDisconnectedNtfn(block.Hash().String(),
+	ntfn := chainjson.NewBlockDisconnectedNtfn(block.Hash().String(),
 		block.Height(), block.MsgBlock().Header.Timestamp.Unix())
-	marshalledJSON, err := btcjson.MarshalCmd(nil, ntfn)
+	marshalledJSON, err := chainjson.MarshalCmd(nil, ntfn)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal block disconnected "+
 			"notification: %v", err)
@@ -781,7 +781,7 @@ func (m *wsNotificationManager) notifyFilteredBlockConnected(clients map[chan st
 			"connected notification: %v", err)
 		return
 	}
-	ntfn := btcjson.NewFilteredBlockConnectedNtfn(block.Height(),
+	ntfn := chainjson.NewFilteredBlockConnectedNtfn(block.Height(),
 		hex.EncodeToString(w.Bytes()), nil)
 
 	// Search for relevant transactions for each client and save them
@@ -802,7 +802,7 @@ func (m *wsNotificationManager) notifyFilteredBlockConnected(clients map[chan st
 		ntfn.SubscribedTxs = subscribedTxs[quitChan]
 
 		// Marshal and queue notification.
-		marshalledJSON, err := btcjson.MarshalCmd(nil, ntfn)
+		marshalledJSON, err := chainjson.MarshalCmd(nil, ntfn)
 		if err != nil {
 			rpcsLog.Errorf("Failed to marshal filtered block "+
 				"connected notification: %v", err)
@@ -831,9 +831,9 @@ func (*wsNotificationManager) notifyFilteredBlockDisconnected(clients map[chan s
 			"disconnected notification: %v", err)
 		return
 	}
-	ntfn := btcjson.NewFilteredBlockDisconnectedNtfn(block.Height(),
+	ntfn := chainjson.NewFilteredBlockDisconnectedNtfn(block.Height(),
 		hex.EncodeToString(w.Bytes()))
-	marshalledJSON, err := btcjson.MarshalCmd(nil, ntfn)
+	marshalledJSON, err := chainjson.MarshalCmd(nil, ntfn)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal filtered block disconnected "+
 			"notification: %v", err)
@@ -879,14 +879,14 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClie
 		amount += txOut.Value
 	}
 
-	ntfn := btcjson.NewTxAcceptedNtfn(txHashStr, util.Amount(amount).ToBTC())
-	marshalledJSON, err := btcjson.MarshalCmd(nil, ntfn)
+	ntfn := chainjson.NewTxAcceptedNtfn(txHashStr, util.Amount(amount).ToBTC())
+	marshalledJSON, err := chainjson.MarshalCmd(nil, ntfn)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal tx notification: %s", err.Error())
 		return
 	}
 
-	var verboseNtfn *btcjson.TxAcceptedVerboseNtfn
+	var verboseNtfn *chainjson.TxAcceptedVerboseNtfn
 	var marshalledJSONVerbose []byte
 	for _, wsc := range clients {
 		if wsc.verboseTxUpdates {
@@ -902,8 +902,8 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClie
 				return
 			}
 
-			verboseNtfn = btcjson.NewTxAcceptedVerboseNtfn(*rawTx)
-			marshalledJSONVerbose, err = btcjson.MarshalCmd(nil,
+			verboseNtfn = chainjson.NewTxAcceptedVerboseNtfn(*rawTx)
+			marshalledJSONVerbose, err = chainjson.MarshalCmd(nil,
 				verboseNtfn)
 			if err != nil {
 				rpcsLog.Errorf("Failed to marshal verbose tx "+
@@ -928,14 +928,14 @@ func (m *wsNotificationManager) notifyForNewOdr(clients map[chan struct{}]*wsCli
 		amount += odrOut.Value
 	}
 
-	ntfn := btcjson.NewOdrAcceptedNtfn(odrHashStr, util.Amount(amount).ToBTC())
-	marshalledJSON, err := btcjson.MarshalCmd(nil, ntfn)
+	ntfn := chainjson.NewOdrAcceptedNtfn(odrHashStr, util.Amount(amount).ToBTC())
+	marshalledJSON, err := chainjson.MarshalCmd(nil, ntfn)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal odr notification: %s", err.Error())
 		return
 	}
 
-	var verboseNtfn *btcjson.OdrAcceptedVerboseNtfn
+	var verboseNtfn *chainjson.OdrAcceptedVerboseNtfn
 	var marshalledJSONVerbose []byte
 	for _, wsc := range clients {
 		if wsc.verboseOdrUpdates {
@@ -951,8 +951,8 @@ func (m *wsNotificationManager) notifyForNewOdr(clients map[chan struct{}]*wsCli
 				return
 			}
 
-			verboseNtfn = btcjson.NewOdrAcceptedVerboseNtfn(*rawOdr)
-			marshalledJSONVerbose, err = btcjson.MarshalCmd(nil,
+			verboseNtfn = chainjson.NewOdrAcceptedVerboseNtfn(*rawOdr)
+			marshalledJSONVerbose, err = chainjson.MarshalCmd(nil,
 				verboseNtfn)
 			if err != nil {
 				rpcsLog.Errorf("Failed to marshal verbose odr "+
@@ -1061,11 +1061,11 @@ func txHexString(tx *wire.MsgTx) string {
 
 // blockDetails creates a BlockDetails struct to include in btcws notifications
 // from a block and a transaction's block index.
-func blockDetails(block *util.Block, txIndex int) *btcjson.BlockDetails {
+func blockDetails(block *util.Block, txIndex int) *chainjson.BlockDetails {
 	if block == nil {
 		return nil
 	}
-	return &btcjson.BlockDetails{
+	return &chainjson.BlockDetails{
 		Height: block.Height(),
 		Hash:   block.Hash().String(),
 		Index:  txIndex,
@@ -1077,8 +1077,8 @@ func blockDetails(block *util.Block, txIndex int) *btcjson.BlockDetails {
 // with the passed parameters.
 func newRedeemingTxNotification(txHex string, index int, block *util.Block) ([]byte, error) {
 	// Create and marshal the notification.
-	ntfn := btcjson.NewRedeemingTxNtfn(txHex, blockDetails(block, index))
-	return btcjson.MarshalCmd(nil, ntfn)
+	ntfn := chainjson.NewRedeemingTxNtfn(txHex, blockDetails(block, index))
+	return chainjson.MarshalCmd(nil, ntfn)
 }
 
 // notifyForTxOuts examines each transaction output, notifying interested
@@ -1111,10 +1111,10 @@ func (m *wsNotificationManager) notifyForTxOuts(ops map[wire.OutPoint]map[chan s
 			if txHex == "" {
 				txHex = txHexString(tx.MsgTx())
 			}
-			ntfn := btcjson.NewRecvTxNtfn(txHex, blockDetails(block,
+			ntfn := chainjson.NewRecvTxNtfn(txHex, blockDetails(block,
 				tx.Index()))
 
-			marshalledJSON, err := btcjson.MarshalCmd(nil, ntfn)
+			marshalledJSON, err := chainjson.MarshalCmd(nil, ntfn)
 			if err != nil {
 				rpcsLog.Errorf("Failed to marshal processedtx notification: %v", err)
 				continue
@@ -1144,8 +1144,8 @@ func (m *wsNotificationManager) notifyRelevantTxAccepted(tx *util.Tx,
 	clientsToNotify := m.subscribedClients(tx, clients)
 
 	if len(clientsToNotify) != 0 {
-		n := btcjson.NewRelevantTxAcceptedNtfn(txHexString(tx.MsgTx()))
-		marshalled, err := btcjson.MarshalCmd(nil, n)
+		n := chainjson.NewRelevantTxAcceptedNtfn(txHexString(tx.MsgTx()))
+		marshalled, err := chainjson.MarshalCmd(nil, n)
 		if err != nil {
 			rpcsLog.Errorf("Failed to marshal notification: %v", err)
 			return
@@ -1167,8 +1167,8 @@ func (m *wsNotificationManager) notifyRelevantOdrAccepted(odr *util.Odr,
 	clientsToNotify := m.subscribedClients(odr.Tx, clients)
 
 	if len(clientsToNotify) != 0 {
-		n := btcjson.NewRelevantOdrAcceptedNtfn(txHexString(odr.MsgTx()))
-		marshalled, err := btcjson.MarshalCmd(nil, n)
+		n := chainjson.NewRelevantOdrAcceptedNtfn(txHexString(odr.MsgTx()))
+		marshalled, err := chainjson.MarshalCmd(nil, n)
 		if err != nil {
 			rpcsLog.Errorf("Failed to marshal notification: %v", err)
 			return
@@ -1462,15 +1462,15 @@ out:
 			break out
 		}
 
-		var request btcjson.Request
+		var request chainjson.Request
 		err = json.Unmarshal(msg, &request)
 		if err != nil {
 			if !c.authenticated {
 				break out
 			}
 
-			jsonErr := &btcjson.RPCError{
-				Code:    btcjson.ErrRPCParse.Code,
+			jsonErr := &chainjson.RPCError{
+				Code:    chainjson.ErrRPCParse.Code,
 				Message: "Failed to parse request: " + err.Error(),
 			}
 			reply, err := createMarshalledReply(nil, nil, jsonErr)
@@ -1530,7 +1530,7 @@ out:
 		// the authenticate request, an authenticate request is received
 		// when the client is already authenticated, or incorrect
 		// authentication credentials are provided in the request.
-		switch authCmd, ok := cmd.cmd.(*btcjson.AuthenticateCmd); {
+		switch authCmd, ok := cmd.cmd.(*chainjson.AuthenticateCmd); {
 		case c.authenticated && ok:
 			rpcsLog.Warnf("Websocket client %s is already authenticated",
 				c.addr)
@@ -1568,8 +1568,8 @@ out:
 		// error when not authorized to call this RPC.
 		if !c.isAdmin {
 			if _, ok := rpcLimited[request.Method]; !ok {
-				jsonErr := &btcjson.RPCError{
-					Code:    btcjson.ErrRPCInvalidParams.Code,
+				jsonErr := &chainjson.RPCError{
+					Code:    chainjson.ErrRPCInvalidParams.Code,
 					Message: "limited user not authorized for this method",
 				}
 				// Marshal and send response.
@@ -1874,9 +1874,9 @@ func newWebsocketClient(server *rpcServer, conn *websocket.Conn,
 
 // handleWebsocketHelp implements the help command for websocket connections.
 func handleWebsocketHelp(wsc *wsClient, icmd interface{}) (interface{}, error) {
-	cmd, ok := icmd.(*btcjson.HelpCmd)
+	cmd, ok := icmd.(*chainjson.HelpCmd)
 	if !ok {
-		return nil, btcjson.ErrRPCInternal
+		return nil, chainjson.ErrRPCInternal
 	}
 
 	// Provide a usage overview of all commands when no specific command
@@ -1904,8 +1904,8 @@ func handleWebsocketHelp(wsc *wsClient, icmd interface{}) (interface{}, error) {
 		}
 	}
 	if !valid {
-		return nil, &btcjson.RPCError{
-			Code:    btcjson.ErrRPCInvalidParameter,
+		return nil, &chainjson.RPCError{
+			Code:    chainjson.ErrRPCInvalidParameter,
 			Message: "Unknown command: " + command,
 		}
 	}
@@ -1924,14 +1924,14 @@ func handleWebsocketHelp(wsc *wsClient, icmd interface{}) (interface{}, error) {
 //
 // NOTE: This extension is ported from github.com/decred/dcrd
 func handleLoadTxFilter(wsc *wsClient, icmd interface{}) (interface{}, error) {
-	cmd := icmd.(*btcjson.LoadTxFilterCmd)
+	cmd := icmd.(*chainjson.LoadTxFilterCmd)
 
 	outPoints := make([]wire.OutPoint, len(cmd.OutPoints))
 	for i := range cmd.OutPoints {
 		hash, err := chainhash.NewHashFromStr(cmd.OutPoints[i].Hash)
 		if err != nil {
-			return nil, &btcjson.RPCError{
-				Code:    btcjson.ErrRPCInvalidParameter,
+			return nil, &chainjson.RPCError{
+				Code:    chainjson.ErrRPCInvalidParameter,
 				Message: err.Error(),
 			}
 		}
@@ -1974,7 +1974,7 @@ func handleNotifyBlocks(wsc *wsClient, icmd interface{}) (interface{}, error) {
 // handleSession implements the session command extension for websocket
 // connections.
 func handleSession(wsc *wsClient, icmd interface{}) (interface{}, error) {
-	return &btcjson.SessionResult{SessionID: wsc.sessionID}, nil
+	return &chainjson.SessionResult{SessionID: wsc.sessionID}, nil
 }
 
 // handleStopNotifyBlocks implements the stopnotifyblocks command extension for
@@ -1987,9 +1987,9 @@ func handleStopNotifyBlocks(wsc *wsClient, icmd interface{}) (interface{}, error
 // handleNotifySpent implements the notifyspent command extension for
 // websocket connections.
 func handleNotifySpent(wsc *wsClient, icmd interface{}) (interface{}, error) {
-	cmd, ok := icmd.(*btcjson.NotifySpentCmd)
+	cmd, ok := icmd.(*chainjson.NotifySpentCmd)
 	if !ok {
-		return nil, btcjson.ErrRPCInternal
+		return nil, chainjson.ErrRPCInternal
 	}
 
 	outpoints, err := deserializeOutpoints(cmd.OutPoints)
@@ -2004,9 +2004,9 @@ func handleNotifySpent(wsc *wsClient, icmd interface{}) (interface{}, error) {
 // handleNotifyNewTransations implements the notifynewtransactions command
 // extension for websocket connections.
 func handleNotifyNewTransactions(wsc *wsClient, icmd interface{}) (interface{}, error) {
-	cmd, ok := icmd.(*btcjson.NotifyNewTransactionsCmd)
+	cmd, ok := icmd.(*chainjson.NotifyNewTransactionsCmd)
 	if !ok {
-		return nil, btcjson.ErrRPCInternal
+		return nil, chainjson.ErrRPCInternal
 	}
 
 	wsc.verboseTxUpdates = cmd.Verbose != nil && *cmd.Verbose
@@ -2024,9 +2024,9 @@ func handleStopNotifyNewTransactions(wsc *wsClient, icmd interface{}) (interface
 // handleNotifyNewTransations implements the notifyneworders command
 // extension for websocket connections.
 func handleNotifyNewOrders(wsc *wsClient, icmd interface{}) (interface{}, error) {
-	cmd, ok := icmd.(*btcjson.NotifyNewOrdersCmd)
+	cmd, ok := icmd.(*chainjson.NotifyNewOrdersCmd)
 	if !ok {
-		return nil, btcjson.ErrRPCInternal
+		return nil, chainjson.ErrRPCInternal
 	}
 
 	wsc.verboseOdrUpdates = cmd.Verbose != nil && *cmd.Verbose
@@ -2044,9 +2044,9 @@ func handleStopNotifyNewOrders(wsc *wsClient, icmd interface{}) (interface{}, er
 // handleNotifyReceived implements the notifyreceived command extension for
 // websocket connections.
 func handleNotifyReceived(wsc *wsClient, icmd interface{}) (interface{}, error) {
-	cmd, ok := icmd.(*btcjson.NotifyReceivedCmd)
+	cmd, ok := icmd.(*chainjson.NotifyReceivedCmd)
 	if !ok {
-		return nil, btcjson.ErrRPCInternal
+		return nil, chainjson.ErrRPCInternal
 	}
 
 	// Decode addresses to validate input, but the strings slice is used
@@ -2063,9 +2063,9 @@ func handleNotifyReceived(wsc *wsClient, icmd interface{}) (interface{}, error) 
 // handleStopNotifySpent implements the stopnotifyspent command extension for
 // websocket connections.
 func handleStopNotifySpent(wsc *wsClient, icmd interface{}) (interface{}, error) {
-	cmd, ok := icmd.(*btcjson.StopNotifySpentCmd)
+	cmd, ok := icmd.(*chainjson.StopNotifySpentCmd)
 	if !ok {
-		return nil, btcjson.ErrRPCInternal
+		return nil, chainjson.ErrRPCInternal
 	}
 
 	outpoints, err := deserializeOutpoints(cmd.OutPoints)
@@ -2083,9 +2083,9 @@ func handleStopNotifySpent(wsc *wsClient, icmd interface{}) (interface{}, error)
 // handleStopNotifyReceived implements the stopnotifyreceived command extension
 // for websocket connections.
 func handleStopNotifyReceived(wsc *wsClient, icmd interface{}) (interface{}, error) {
-	cmd, ok := icmd.(*btcjson.StopNotifyReceivedCmd)
+	cmd, ok := icmd.(*chainjson.StopNotifyReceivedCmd)
 	if !ok {
-		return nil, btcjson.ErrRPCInternal
+		return nil, chainjson.ErrRPCInternal
 	}
 
 	// Decode addresses to validate input, but the strings slice is used
@@ -2110,8 +2110,8 @@ func checkAddressValidity(addrs []string, params *chaincfg.Params) error {
 	for _, addr := range addrs {
 		_, err := util.DecodeAddress(addr, params)
 		if err != nil {
-			return &btcjson.RPCError{
-				Code: btcjson.ErrRPCInvalidAddressOrKey,
+			return &chainjson.RPCError{
+				Code: chainjson.ErrRPCInvalidAddressOrKey,
 				Message: fmt.Sprintf("Invalid address or key: %v",
 					addr),
 			}
@@ -2121,7 +2121,7 @@ func checkAddressValidity(addrs []string, params *chaincfg.Params) error {
 }
 
 // deserializeOutpoints deserializes each serialized outpoint.
-func deserializeOutpoints(serializedOuts []btcjson.OutPoint) ([]*wire.OutPoint, error) {
+func deserializeOutpoints(serializedOuts []chainjson.OutPoint) ([]*wire.OutPoint, error) {
 	outpoints := make([]*wire.OutPoint, 0, len(serializedOuts))
 	for i := range serializedOuts {
 		blockHash, err := chainhash.NewHashFromStr(serializedOuts[i].Hash)
@@ -2154,8 +2154,8 @@ func (r *rescanKeys) unspentSlice() []*wire.OutPoint {
 
 // ErrRescanReorg defines the error that is returned when an unrecoverable
 // reorganize is detected during a rescan.
-var ErrRescanReorg = btcjson.RPCError{
-	Code:    btcjson.ErrRPCDatabase,
+var ErrRescanReorg = chainjson.RPCError{
+	Code:    chainjson.ErrRPCDatabase,
 	Message: "Reorganize",
 }
 
@@ -2185,7 +2185,7 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *util.Block) {
 			)
 			if err != nil {
 				return fmt.Errorf("unable to marshal "+
-					"btcjson.RedeeminTxNtfn: %v", err)
+					"chainjson.RedeeminTxNtfn: %v", err)
 			}
 
 			return wsc.QueueNotification(marshalledJSON)
@@ -2281,10 +2281,10 @@ func rescanBlock(wsc *wsClient, lookups *rescanKeys, blk *util.Block) {
 				if txHex == "" {
 					txHex = txHexString(tx.MsgTx())
 				}
-				ntfn := btcjson.NewRecvTxNtfn(txHex,
+				ntfn := chainjson.NewRecvTxNtfn(txHex,
 					blockDetails(blk, tx.Index()))
 
-				marshalledJSON, err := btcjson.MarshalCmd(nil, ntfn)
+				marshalledJSON, err := chainjson.MarshalCmd(nil, ntfn)
 				if err != nil {
 					rpcsLog.Errorf("Failed to marshal recvtx notification: %v", err)
 					return
@@ -2370,9 +2370,9 @@ func rescanBlockFilter(filter *wsClientFilter, block *util.Block, params *chainc
 //
 // NOTE: This extension is ported from github.com/decred/dcrd
 func handleRescanBlocks(wsc *wsClient, icmd interface{}) (interface{}, error) {
-	cmd, ok := icmd.(*btcjson.RescanBlocksCmd)
+	cmd, ok := icmd.(*chainjson.RescanBlocksCmd)
 	if !ok {
-		return nil, btcjson.ErrRPCInternal
+		return nil, chainjson.ErrRPCInternal
 	}
 
 	// Load client's transaction filter.  Must exist in order to continue.
@@ -2380,8 +2380,8 @@ func handleRescanBlocks(wsc *wsClient, icmd interface{}) (interface{}, error) {
 	filter := wsc.filterData
 	wsc.Unlock()
 	if filter == nil {
-		return nil, &btcjson.RPCError{
-			Code:    btcjson.ErrRPCMisc,
+		return nil, &chainjson.RPCError{
+			Code:    chainjson.ErrRPCMisc,
 			Message: "Transaction filter must be loaded before rescanning",
 		}
 	}
@@ -2396,7 +2396,7 @@ func handleRescanBlocks(wsc *wsClient, icmd interface{}) (interface{}, error) {
 		blockHashes[i] = hash
 	}
 
-	discoveredData := make([]btcjson.RescannedBlock, 0, len(blockHashes))
+	discoveredData := make([]chainjson.RescannedBlock, 0, len(blockHashes))
 
 	// Iterate over each block in the request and rescan.  When a block
 	// contains relevant transactions, add it to the response.
@@ -2406,14 +2406,14 @@ func handleRescanBlocks(wsc *wsClient, icmd interface{}) (interface{}, error) {
 	for i := range blockHashes {
 		block, err := bc.BlockByHash(blockHashes[i])
 		if err != nil {
-			return nil, &btcjson.RPCError{
-				Code:    btcjson.ErrRPCBlockNotFound,
+			return nil, &chainjson.RPCError{
+				Code:    chainjson.ErrRPCBlockNotFound,
 				Message: "Failed to fetch block: " + err.Error(),
 			}
 		}
 		if lastBlockHash != nil && block.MsgBlock().Header.PrevBlock != *lastBlockHash {
-			return nil, &btcjson.RPCError{
-				Code: btcjson.ErrRPCInvalidParameter,
+			return nil, &chainjson.RPCError{
+				Code: chainjson.ErrRPCInvalidParameter,
 				Message: fmt.Sprintf("Block %v is not a child of %v",
 					blockHashes[i], lastBlockHash),
 			}
@@ -2422,7 +2422,7 @@ func handleRescanBlocks(wsc *wsClient, icmd interface{}) (interface{}, error) {
 
 		transactions := rescanBlockFilter(filter, block, params)
 		if len(transactions) != 0 {
-			discoveredData = append(discoveredData, btcjson.RescannedBlock{
+			discoveredData = append(discoveredData, chainjson.RescannedBlock{
 				Hash:         cmd.BlockHashes[i],
 				Transactions: transactions,
 			})
@@ -2443,8 +2443,8 @@ func recoverFromReorg(chain *blockchain.BlockChain, minBlock, maxBlock int32,
 	hashList, err := chain.HeightRange(minBlock, maxBlock)
 	if err != nil {
 		rpcsLog.Errorf("Error looking up block range: %v", err)
-		return nil, &btcjson.RPCError{
-			Code:    btcjson.ErrRPCDatabase,
+		return nil, &chainjson.RPCError{
+			Code:    chainjson.ErrRPCDatabase,
 			Message: "Database error: " + err.Error(),
 		}
 	}
@@ -2456,8 +2456,8 @@ func recoverFromReorg(chain *blockchain.BlockChain, minBlock, maxBlock int32,
 	if err != nil {
 		rpcsLog.Errorf("Error looking up possibly reorged block: %v",
 			err)
-		return nil, &btcjson.RPCError{
-			Code:    btcjson.ErrRPCDatabase,
+		return nil, &chainjson.RPCError{
+			Code:    chainjson.ErrRPCDatabase,
 			Message: "Database error: " + err.Error(),
 		}
 	}
@@ -2491,9 +2491,9 @@ func descendantBlock(prevHash *chainhash.Hash, curBlock *util.Block) error {
 // the chain (perhaps from a rescanprogress notification) to resume their
 // rescan.
 func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
-	cmd, ok := icmd.(*btcjson.RescanCmd)
+	cmd, ok := icmd.(*chainjson.RescanCmd)
 	if !ok {
-		return nil, btcjson.ErrRPCInternal
+		return nil, chainjson.ErrRPCInternal
 	}
 
 	outpoints := make([]*wire.OutPoint, 0, len(cmd.OutPoints))
@@ -2534,8 +2534,8 @@ func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
 	}
 	minBlock, err := chain.BlockHeightByHash(minBlockHash)
 	if err != nil {
-		return nil, &btcjson.RPCError{
-			Code:    btcjson.ErrRPCBlockNotFound,
+		return nil, &chainjson.RPCError{
+			Code:    chainjson.ErrRPCBlockNotFound,
 			Message: "Error getting block: " + err.Error(),
 		}
 	}
@@ -2548,8 +2548,8 @@ func handleRescan(wsc *wsClient, icmd interface{}) (interface{}, error) {
 		}
 		maxBlock, err = chain.BlockHeightByHash(maxBlockHash)
 		if err != nil {
-			return nil, &btcjson.RPCError{
-				Code:    btcjson.ErrRPCBlockNotFound,
+			return nil, &chainjson.RPCError{
+				Code:    chainjson.ErrRPCBlockNotFound,
 				Message: "Error getting block: " + err.Error(),
 			}
 		}
@@ -2581,8 +2581,8 @@ fetchRange:
 		hashList, err := chain.HeightRange(minBlock, maxLoopBlock)
 		if err != nil {
 			rpcsLog.Errorf("Error looking up block range: %v", err)
-			return nil, &btcjson.RPCError{
-				Code:    btcjson.ErrRPCDatabase,
+			return nil, &chainjson.RPCError{
+				Code:    chainjson.ErrRPCDatabase,
 				Message: "Database error: " + err.Error(),
 			}
 		}
@@ -2620,8 +2620,8 @@ fetchRange:
 			if err != nil {
 				rpcsLog.Errorf("Error fetching best block "+
 					"hash: %v", err)
-				return nil, &btcjson.RPCError{
-					Code: btcjson.ErrRPCDatabase,
+				return nil, &chainjson.RPCError{
+					Code: chainjson.ErrRPCDatabase,
 					Message: "Database error: " +
 						err.Error(),
 				}
@@ -2643,8 +2643,8 @@ fetchRange:
 
 					rpcsLog.Errorf("Error looking up "+
 						"block: %v", err)
-					return nil, &btcjson.RPCError{
-						Code: btcjson.ErrRPCDatabase,
+					return nil, &chainjson.RPCError{
+						Code: chainjson.ErrRPCDatabase,
 						Message: "Database error: " +
 							err.Error(),
 					}
@@ -2711,9 +2711,9 @@ fetchRange:
 				continue
 			}
 
-			n := btcjson.NewRescanProgressNtfn(hashList[i].String(),
+			n := chainjson.NewRescanProgressNtfn(hashList[i].String(),
 				blk.Height(), blk.MsgBlock().Header.Timestamp.Unix())
-			mn, err := btcjson.MarshalCmd(nil, n)
+			mn, err := chainjson.MarshalCmd(nil, n)
 			if err != nil {
 				rpcsLog.Errorf("Failed to marshal rescan "+
 					"progress notification: %v", err)
@@ -2738,10 +2738,10 @@ fetchRange:
 	// received before the rescan RPC returns.  Therefore, another method
 	// is needed to safely inform clients that all rescan notifications have
 	// been sent.
-	n := btcjson.NewRescanFinishedNtfn(lastBlockHash.String(),
+	n := chainjson.NewRescanFinishedNtfn(lastBlockHash.String(),
 		lastBlock.Height(),
 		lastBlock.MsgBlock().Header.Timestamp.Unix())
-	if mn, err := btcjson.MarshalCmd(nil, n); err != nil {
+	if mn, err := chainjson.MarshalCmd(nil, n); err != nil {
 		rpcsLog.Errorf("Failed to marshal rescan finished "+
 			"notification: %v", err)
 	} else {

@@ -13,7 +13,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/endurio/ndrd/btcjson"
+	"github.com/endurio/ndrd/chainjson"
 	"github.com/endurio/ndrd/util"
 	flags "github.com/jessevdk/go-flags"
 )
@@ -22,7 +22,7 @@ const (
 	// unusableFlags are the command usage flags which this utility are not
 	// able to use.  In particular it doesn't support websockets and
 	// consequently notifications.
-	unusableFlags = btcjson.UFWebsocketOnly | btcjson.UFNotification
+	unusableFlags = chainjson.UFWebsocketOnly | chainjson.UFNotification
 )
 
 var (
@@ -45,10 +45,10 @@ func listCommands() {
 	)
 
 	// Get a list of registered commands and categorize and filter them.
-	cmdMethods := btcjson.RegisteredCmdMethods()
+	cmdMethods := chainjson.RegisteredCmdMethods()
 	categorized := make([][]string, numCategories)
 	for _, method := range cmdMethods {
-		flags, err := btcjson.MethodUsageFlags(method)
+		flags, err := chainjson.MethodUsageFlags(method)
 		if err != nil {
 			// This should never happen since the method was just
 			// returned from the package, but be safe.
@@ -60,7 +60,7 @@ func listCommands() {
 			continue
 		}
 
-		usage, err := btcjson.MethodUsageText(method)
+		usage, err := chainjson.MethodUsageText(method)
 		if err != nil {
 			// This should never happen since the method was just
 			// returned from the package, but be safe.
@@ -69,7 +69,7 @@ func listCommands() {
 
 		// Categorize the command based on the usage flags.
 		category := categoryChain
-		if flags&btcjson.UFWalletOnly != 0 {
+		if flags&chainjson.UFWalletOnly != 0 {
 			category = categoryWallet
 		}
 		categorized[category] = append(categorized[category], usage)

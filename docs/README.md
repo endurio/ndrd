@@ -270,7 +270,7 @@ information.
 * The endurio Bitcoin-related Go Packages:
     * [btcrpcclient](https://github.com/endurio/ndrd/tree/master/rpcclient) - Implements a
       robust and easy to use Websocket-enabled Bitcoin JSON-RPC client
-    * [btcjson](https://github.com/endurio/ndrd/tree/master/btcjson) - Provides an extensive API
+    * [chainjson](https://github.com/endurio/ndrd/tree/master/chainjson) - Provides an extensive API
       for the underlying JSON-RPC command and return values
     * [wire](https://github.com/endurio/ndrd/tree/master/wire) - Implements the
       Bitcoin wire protocol
