@@ -20,12 +20,13 @@ import (
 	"time"
 
 	"github.com/endurio/ndrd/blockchain"
-	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
-	"github.com/endurio/ndrd/txscript"
-	"github.com/endurio/ndrd/wire"
+	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chainutil"
+	"github.com/endurio/ndrd/txscript"
+	"github.com/endurio/ndrd/types"
+	"github.com/endurio/ndrd/wire"
 )
 
 const (
@@ -51,7 +52,7 @@ var (
 
 	// lowFee is a single satoshi and exists to make the test code more
 	// readable.
-	lowFee = chainutil.Amount(1)
+	lowFee = types.Amount(1)
 )
 
 // TestInstance is an interface that describes a specific test instance returned
@@ -155,7 +156,7 @@ func (b RejectedNonCanonicalBlock) FullBlockTestInstance() {}
 // additional metadata such as the block its in and how much it pays.
 type spendableOut struct {
 	prevOut wire.OutPoint
-	amount  chainutil.Amount
+	amount  types.Amount
 }
 
 // makeSpendableOutForTx returns a spendable output for the given transaction
@@ -166,7 +167,7 @@ func makeSpendableOutForTx(tx *wire.MsgTx, txOutIndex uint32) spendableOut {
 			Hash:  tx.TxHash(),
 			Index: txOutIndex,
 		},
-		amount: chainutil.Amount(tx.TxOut[txOutIndex].Value),
+		amount: types.Amount(tx.TxOut[txOutIndex].Value),
 	}
 }
 
@@ -381,7 +382,7 @@ func solveBlock(header *wire.BlockHeader) bool {
 
 // additionalCoinbase returns a function that itself takes a block and
 // modifies it by adding the provided amount to coinbase subsidy.
-func additionalCoinbase(amount chainutil.Amount) func(*wire.MsgBlock) {
+func additionalCoinbase(amount types.Amount) func(*wire.MsgBlock) {
 	return func(b *wire.MsgBlock) {
 		// Increase the first proof-of-work coinbase subsidy by the
 		// provided amount.
@@ -394,7 +395,7 @@ func additionalCoinbase(amount chainutil.Amount) func(*wire.MsgBlock) {
 //
 // NOTE: The coinbase value is NOT updated to reflect the additional fee.  Use
 // 'additionalCoinbase' for that purpose.
-func additionalSpendFee(fee chainutil.Amount) func(*wire.MsgBlock) {
+func additionalSpendFee(fee types.Amount) func(*wire.MsgBlock) {
 	return func(b *wire.MsgBlock) {
 		// Increase the fee of the spending transaction by reducing the
 		// amount paid.
@@ -436,7 +437,7 @@ func additionalTx(tx *wire.MsgTx) func(*wire.MsgBlock) {
 // transaction ends up with a unique hash.  The script is a simple OP_TRUE
 // script which avoids the need to track addresses and signature scripts in the
 // tests.
-func createSpendTx(spend *spendableOut, fee chainutil.Amount) *wire.MsgTx {
+func createSpendTx(spend *spendableOut, fee types.Amount) *wire.MsgTx {
 	spendTx := wire.NewMsgTx(1)
 	spendTx.AddTxIn(&wire.TxIn{
 		PreviousOutPoint: spend.prevOut,
@@ -455,7 +456,7 @@ func createSpendTx(spend *spendableOut, fee chainutil.Amount) *wire.MsgTx {
 // to ensure the transaction ends up with a unique hash.  The public key script
 // is a simple OP_TRUE script which avoids the need to track addresses and
 // signature scripts in the tests.  The signature script is nil.
-func createSpendTxForTx(tx *wire.MsgTx, fee chainutil.Amount) *wire.MsgTx {
+func createSpendTxForTx(tx *wire.MsgTx, fee types.Amount) *wire.MsgTx {
 	spend := makeSpendableOutForTx(tx, 0)
 	return createSpendTx(&spend, fee)
 }
@@ -488,7 +489,7 @@ func (g *testGenerator) nextBlock(blockName string, spend *spendableOut, mungers
 	if spend != nil {
 		// Create the transaction with a fee of 1 atom for the
 		// miner and increase the coinbase subsidy accordingly.
-		fee := chainutil.Amount(1)
+		fee := types.Amount(1)
 		coinbaseTx.TxOut[0].Value += int64(fee)
 
 		// Create a transaction that spends from the provided spendable
@@ -1979,7 +1980,7 @@ func Generate(includeLargeReorg bool) (tests [][]TestInstance, err error) {
 		// each contain an OP_RETURN output.
 		//
 		// NOTE: The createSpendTx func adds the OP_RETURN output.
-		zeroFee := chainutil.Amount(0)
+		zeroFee := types.Amount(0)
 		for i := uint32(0); i < numAdditionalOutputs; i++ {
 			spend := makeSpendableOut(b, 1, i+2)
 			tx := createSpendTx(&spend, zeroFee)

@@ -13,11 +13,12 @@ import (
 	"time"
 
 	"github.com/endurio/ndrd/blockchain"
-	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
-	"github.com/endurio/ndrd/mining"
+	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chainutil"
+	"github.com/endurio/ndrd/mining"
+	"github.com/endurio/ndrd/types"
 	"github.com/endurio/ndrd/wire"
 )
 
@@ -192,7 +193,7 @@ func (m *CPUMiner) submitBlock(block *chainutil.Block) bool {
 	// The block was accepted.
 	coinbaseTx := block.MsgBlock().Transactions[0].TxOut[0]
 	log.Infof("Block submitted via CPU miner accepted (hash %s, "+
-		"amount %v)", block.Hash(), chainutil.Amount(coinbaseTx.Value))
+		"amount %v)", block.Hash(), types.Amount(coinbaseTx.Value))
 	return true
 }
 

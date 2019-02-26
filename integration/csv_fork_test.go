@@ -32,7 +32,7 @@ const (
 // makeTestOutput creates an on-chain output paying to a freshly generated
 // p2pkh output with the specified amount.
 func makeTestOutput(r *rpctest.Harness, t *testing.T,
-	amt chainutil.Amount) (*chainec.PrivateKey, *wire.OutPoint, []byte, error) {
+	amt types.Amount) (*chainec.PrivateKey, *wire.OutPoint, []byte, error) {
 
 	// Create a fresh key, then send some coins to an address spendable by
 	// that key.
@@ -120,7 +120,7 @@ func TestBIP0113Activation(t *testing.T) {
 	defer r.TearDown()
 
 	// Create a fresh output for usage within the test below.
-	const outputValue = chainutil.AtomPerCoin
+	const outputValue = types.AtomPerCoin
 	outputKey, testOutput, testPkScript, err := makeTestOutput(r, t,
 		outputValue)
 	if err != nil {
@@ -282,7 +282,7 @@ func TestBIP0113Activation(t *testing.T) {
 // createCSVOutput creates an output paying to a trivially redeemable CSV
 // pkScript with the specified time-lock.
 func createCSVOutput(r *rpctest.Harness, t *testing.T,
-	numSatoshis chainutil.Amount, timeLock int32,
+	numSatoshis types.Amount, timeLock int32,
 	isSeconds bool) ([]byte, *wire.OutPoint, *wire.MsgTx, error) {
 
 	// Convert the time-lock to the proper sequence lock based according to
@@ -427,7 +427,7 @@ func TestBIP0068AndBIP0112Activation(t *testing.T) {
 	}
 
 	const (
-		outputAmt         = chainutil.AtomPerCoin
+		outputAmt         = types.AtomPerCoin
 		relativeBlockLock = 10
 	)
 

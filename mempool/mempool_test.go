@@ -111,7 +111,7 @@ func (s *fakeChain) CalcSequenceLock(tx *chainutil.Tx,
 // amount associated with it.
 type spendableOutput struct {
 	outPoint wire.OutPoint
-	amount   chainutil.Amount
+	amount   types.Amount
 }
 
 // txOutToSpendableOut returns a spendable output given a transaction and index
@@ -120,7 +120,7 @@ type spendableOutput struct {
 func txOutToSpendableOut(tx *chainutil.Tx, outputNum uint32) spendableOutput {
 	return spendableOutput{
 		outPoint: wire.OutPoint{Hash: *tx.Hash(), Index: outputNum},
-		amount:   chainutil.Amount(tx.MsgTx().TxOut[outputNum].Value),
+		amount:   types.Amount(tx.MsgTx().TxOut[outputNum].Value),
 	}
 }
 
@@ -191,7 +191,7 @@ func (p *poolHarness) CreateCoinbaseTx(blockHeight int32, numOutputs uint32) (*c
 func (p *poolHarness) CreateSignedTx(inputs []spendableOutput, numOutputs uint32) (*chainutil.Tx, error) {
 	// Calculate the total input amount and split it amongst the requested
 	// number of outputs.
-	var totalInput chainutil.Amount
+	var totalInput types.Amount
 	for _, input := range inputs {
 		totalInput += input.amount
 	}
@@ -617,7 +617,7 @@ func TestBasicOrphanRemoval(t *testing.T) {
 	// Attempt to remove an orphan that has no redeemers and is not present,
 	// and ensure the state of all other orphans are unaffected.
 	nonChainedOrphanTx, err := harness.CreateSignedTx([]spendableOutput{{
-		amount:   chainutil.Amount(5000000000),
+		amount:   types.Amount(5000000000),
 		outPoint: wire.OutPoint{Hash: chainhash.Hash{}, Index: 0},
 	}}, 1)
 	if err != nil {

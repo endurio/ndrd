@@ -24,12 +24,13 @@ import (
 
 	"github.com/btcsuite/websocket"
 	"github.com/endurio/ndrd/blockchain"
-	"github.com/endurio/ndrd/chainjson"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
+	"github.com/endurio/ndrd/chainjson"
+	"github.com/endurio/ndrd/chainutil"
 	"github.com/endurio/ndrd/database"
 	"github.com/endurio/ndrd/txscript"
-	"github.com/endurio/ndrd/chainutil"
+	"github.com/endurio/ndrd/types"
 	"github.com/endurio/ndrd/wire"
 )
 
@@ -879,7 +880,7 @@ func (m *wsNotificationManager) notifyForNewTx(clients map[chan struct{}]*wsClie
 		amount += txOut.Value
 	}
 
-	ntfn := chainjson.NewTxAcceptedNtfn(txHashStr, chainutil.Amount(amount).ToCoin())
+	ntfn := chainjson.NewTxAcceptedNtfn(txHashStr, types.Amount(amount).ToCoin())
 	marshalledJSON, err := chainjson.MarshalCmd(nil, ntfn)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal tx notification: %s", err.Error())
@@ -928,7 +929,7 @@ func (m *wsNotificationManager) notifyForNewOdr(clients map[chan struct{}]*wsCli
 		amount += odrOut.Value
 	}
 
-	ntfn := chainjson.NewOdrAcceptedNtfn(odrHashStr, chainutil.Amount(amount).ToCoin())
+	ntfn := chainjson.NewOdrAcceptedNtfn(odrHashStr, types.Amount(amount).ToCoin())
 	marshalledJSON, err := chainjson.MarshalCmd(nil, ntfn)
 	if err != nil {
 		rpcsLog.Errorf("Failed to marshal odr notification: %s", err.Error())

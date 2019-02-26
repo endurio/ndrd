@@ -18,9 +18,10 @@ import (
 
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
-	"github.com/endurio/ndrd/rpcclient"
-	"github.com/endurio/ndrd/wire"
 	"github.com/endurio/ndrd/chainutil"
+	"github.com/endurio/ndrd/rpcclient"
+	"github.com/endurio/ndrd/types"
+	"github.com/endurio/ndrd/wire"
 )
 
 const (
@@ -342,7 +343,7 @@ func (h *Harness) NewAddress() (chainutil.Address, error) {
 // wallet.
 //
 // This function is safe for concurrent access.
-func (h *Harness) ConfirmedBalance() chainutil.Amount {
+func (h *Harness) ConfirmedBalance() types.Amount {
 	return h.wallet.ConfirmedBalance()
 }
 
@@ -352,7 +353,7 @@ func (h *Harness) ConfirmedBalance() chainutil.Amount {
 //
 // This function is safe for concurrent access.
 func (h *Harness) SendOutputs(targetOutputs []*wire.TxOut,
-	feeRate chainutil.Amount) (*chainhash.Hash, error) {
+	feeRate types.Amount) (*chainhash.Hash, error) {
 
 	return h.wallet.SendOutputs(targetOutputs, feeRate)
 }
@@ -363,7 +364,7 @@ func (h *Harness) SendOutputs(targetOutputs []*wire.TxOut,
 //
 // This function is safe for concurrent access.
 func (h *Harness) SendOutputsWithoutChange(targetOutputs []*wire.TxOut,
-	feeRate chainutil.Amount) (*chainhash.Hash, error) {
+	feeRate types.Amount) (*chainhash.Hash, error) {
 
 	return h.wallet.SendOutputsWithoutChange(targetOutputs, feeRate)
 }
@@ -380,7 +381,7 @@ func (h *Harness) SendOutputsWithoutChange(targetOutputs []*wire.TxOut,
 //
 // This function is safe for concurrent access.
 func (h *Harness) CreateTransaction(targetOutputs []*wire.TxOut,
-	feeRate chainutil.Amount, change bool) (*wire.MsgTx, error) {
+	feeRate types.Amount, change bool) (*wire.MsgTx, error) {
 
 	return h.wallet.CreateTransaction(targetOutputs, feeRate, change)
 }

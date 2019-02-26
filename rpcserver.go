@@ -28,21 +28,22 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/btcsuite/websocket"
 	"github.com/endurio/ndrd/blockchain"
 	"github.com/endurio/ndrd/blockchain/indexers"
-	"github.com/endurio/ndrd/chainec"
-	"github.com/endurio/ndrd/chainjson"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
+	"github.com/endurio/ndrd/chainec"
+	"github.com/endurio/ndrd/chainjson"
+	"github.com/endurio/ndrd/chainutil"
 	"github.com/endurio/ndrd/database"
 	"github.com/endurio/ndrd/mempool"
 	"github.com/endurio/ndrd/mining"
 	"github.com/endurio/ndrd/mining/cpuminer"
 	"github.com/endurio/ndrd/peer"
 	"github.com/endurio/ndrd/txscript"
+	"github.com/endurio/ndrd/types"
 	"github.com/endurio/ndrd/wire"
-	"github.com/endurio/ndrd/chainutil"
-	"github.com/btcsuite/websocket"
 )
 
 // API version constants
@@ -556,7 +557,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 	params := s.cfg.ChainParams
 	for encodedAddr, amount := range c.Amounts {
 		// Ensure amount is in the valid range for monetary amounts.
-		if amount <= 0 || amount > chainutil.MaxAtom {
+		if amount <= 0 || amount > types.MaxAtom {
 			return nil, &chainjson.RPCError{
 				Code:    chainjson.ErrRPCType,
 				Message: "Invalid amount",
@@ -600,7 +601,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 		}
 
 		// Convert the amount to satoshi.
-		satoshi, err := chainutil.NewAmount(amount)
+		satoshi, err := types.NewAmount(amount)
 		if err != nil {
 			context := "Failed to convert amount"
 			return nil, internalRPCError(err.Error(), context)
@@ -739,7 +740,7 @@ func createVoutList(mtx *wire.MsgTx, chainParams *chaincfg.Params, filterAddrMap
 
 		var vout chainjson.Vout
 		vout.N = uint32(i)
-		vout.Value = chainutil.Amount(v.Value).ToCoin()
+		vout.Value = types.Amount(v.Value).ToCoin()
 		vout.ScriptPubKey.Addresses = encodedAddrs
 		vout.ScriptPubKey.Asm = disbuf
 		vout.ScriptPubKey.Hex = hex.EncodeToString(v.PkScript)
@@ -2920,7 +2921,7 @@ func handleGetTxOut(s *rpcServer, cmd interface{}, closeChan <-chan struct{}) (i
 	txOutReply := &chainjson.GetTxOutResult{
 		BestBlock:     bestBlockHash,
 		Confirmations: int64(confirmations),
-		Value:         chainutil.Amount(value).ToCoin(),
+		Value:         types.Amount(value).ToCoin(),
 		ScriptPubKey: chainjson.ScriptPubKeyResult{
 			Asm:       disbuf,
 			Hex:       hex.EncodeToString(pkScript),
@@ -3177,7 +3178,7 @@ func createVinListPrevOut(s *rpcServer, mtx *wire.MsgTx, chainParams *chaincfg.P
 			vinListEntry := &vinList[len(vinList)-1]
 			vinListEntry.PrevOut = &chainjson.PrevOut{
 				Addresses: encodedAddrs,
-				Value:     chainutil.Amount(originTxOut.Value).ToCoin(),
+				Value:     types.Amount(originTxOut.Value).ToCoin(),
 			}
 		}
 	}
@@ -4564,7 +4565,7 @@ func newRPCServer(config *rpcserverConfig) (*rpcServer, error) {
 		gbtWorkState:           newGbtWorkState(config.TimeSource, config.PriceSource),
 		helpCacher:             newHelpCacher(),
 		requestProcessShutdown: make(chan struct{}),
-		quit: make(chan int),
+		quit:                   make(chan int),
 	}
 	if cfg.RPCUser != "" && cfg.RPCPass != "" {
 		login := cfg.RPCUser + ":" + cfg.RPCPass

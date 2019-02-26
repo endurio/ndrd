@@ -14,10 +14,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/endurio/ndrd/chainjson"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
-	"github.com/endurio/ndrd/wire"
+	"github.com/endurio/ndrd/chainjson"
 	"github.com/endurio/ndrd/chainutil"
+	"github.com/endurio/ndrd/types"
+	"github.com/endurio/ndrd/wire"
 )
 
 var (
@@ -174,7 +175,7 @@ type NotificationHandlers struct {
 	// memory pool.  It will only be invoked if a preceding call to
 	// NotifyNewTransactions with the verbose flag set to false has been
 	// made to register for the notification and the function is non-nil.
-	OnTxAccepted func(hash *chainhash.Hash, amount chainutil.Amount)
+	OnTxAccepted func(hash *chainhash.Hash, amount types.Amount)
 
 	// OnTxAccepted is invoked when a transaction is accepted into the
 	// memory pool.  It will only be invoked if a preceding call to
@@ -193,7 +194,7 @@ type NotificationHandlers struct {
 	//
 	// This will only be available when speaking to a wallet server
 	// such as btcwallet.
-	OnAccountBalance func(account string, balance chainutil.Amount, confirmed bool)
+	OnAccountBalance func(account string, balance types.Amount, confirmed bool)
 
 	// OnWalletLockState is invoked when a wallet is locked or unlocked.
 	//
@@ -721,7 +722,7 @@ func parseRescanProgressParams(params []json.RawMessage) (*chainhash.Hash, int32
 // parseTxAcceptedNtfnParams parses out the transaction hash and total amount
 // from the parameters of a txaccepted notification.
 func parseTxAcceptedNtfnParams(params []json.RawMessage) (*chainhash.Hash,
-	chainutil.Amount, error) {
+	types.Amount, error) {
 
 	if len(params) != 2 {
 		return nil, 0, wrongNumParams(len(params))
@@ -742,7 +743,7 @@ func parseTxAcceptedNtfnParams(params []json.RawMessage) (*chainhash.Hash,
 	}
 
 	// Bounds check amount.
-	amt, err := chainutil.NewAmount(famt)
+	amt, err := types.NewAmount(famt)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -799,7 +800,7 @@ func parseBtcdConnectedNtfnParams(params []json.RawMessage) (bool, error) {
 // and whether or not the balance is confirmed or unconfirmed from the
 // parameters of an accountbalance notification.
 func parseAccountBalanceNtfnParams(params []json.RawMessage) (account string,
-	balance chainutil.Amount, confirmed bool, err error) {
+	balance types.Amount, confirmed bool, err error) {
 
 	if len(params) != 3 {
 		return "", 0, false, wrongNumParams(len(params))
@@ -825,7 +826,7 @@ func parseAccountBalanceNtfnParams(params []json.RawMessage) (account string,
 	}
 
 	// Bounds check amount.
-	bal, err := chainutil.NewAmount(fbal)
+	bal, err := types.NewAmount(fbal)
 	if err != nil {
 		return "", 0, false, err
 	}

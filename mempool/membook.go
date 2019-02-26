@@ -14,12 +14,13 @@ import (
 	"time"
 
 	"github.com/endurio/ndrd/blockchain"
-	"github.com/endurio/ndrd/chainjson"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
+	"github.com/endurio/ndrd/chainjson"
+	"github.com/endurio/ndrd/chainutil"
 	"github.com/endurio/ndrd/mining"
 	"github.com/endurio/ndrd/txscript"
-	"github.com/endurio/ndrd/chainutil"
+	"github.com/endurio/ndrd/types"
 	"github.com/endurio/ndrd/wire"
 )
 
@@ -201,8 +202,8 @@ func (ob *OdrBook) addOrder(odr *chainutil.Odr, stb, ndr int64, height int32) *O
 			Added:  time.Now(),
 			Height: height,
 			Bid:    ndr > 0,
-			Amount: chainutil.Amount(abs(ndr)),
-			Payout: chainutil.Amount(abs(stb)),
+			Amount: types.Amount(abs(ndr)),
+			Payout: types.Amount(abs(stb)),
 		},
 	}
 

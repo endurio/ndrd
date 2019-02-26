@@ -354,7 +354,7 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 
 		var (
 			witness  wire.TxWitness
-			inputAmt chainutil.Amount
+			inputAmt types.Amount
 		)
 
 		// When the first field of the test data is a slice it contains
@@ -374,7 +374,7 @@ func testScripts(t *testing.T, tests [][]interface{}, useSigCache bool) {
 				continue
 			}
 
-			inputAmt, err = chainutil.NewAmount(witnessData[len(witnessData)-1].(float64))
+			inputAmt, err = types.NewAmount(witnessData[len(witnessData)-1].(float64))
 			if err != nil {
 				t.Errorf("%s: can't parse input amt: %v",
 					name, err)

@@ -15,13 +15,14 @@ import (
 
 	"github.com/endurio/ndrd/blockchain"
 	"github.com/endurio/ndrd/blockchain/indexers"
-	"github.com/endurio/ndrd/chainjson"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
+	"github.com/endurio/ndrd/chainjson"
+	"github.com/endurio/ndrd/chainutil"
 	"github.com/endurio/ndrd/mining"
 	"github.com/endurio/ndrd/txscript"
+	"github.com/endurio/ndrd/types"
 	"github.com/endurio/ndrd/wire"
-	"github.com/endurio/ndrd/chainutil"
 )
 
 const (
@@ -133,7 +134,7 @@ type Policy struct {
 
 	// MinRelayTxFee defines the minimum transaction fee in BTC/kB to be
 	// considered a non-zero fee.
-	MinRelayTxFee chainutil.Amount
+	MinRelayTxFee types.Amount
 }
 
 // TxDesc is a descriptor containing a transaction in the mempool along with
@@ -1207,7 +1208,7 @@ func (mp *TxPool) RawMempoolVerbose() map[string]*chainjson.GetRawMempoolVerbose
 		mpd := &chainjson.GetRawMempoolVerboseResult{
 			Size:             int32(tx.MsgTx().SerializeSize()),
 			Vsize:            int32(GetTxVirtualSize(tx)),
-			Fee:              chainutil.Amount(desc.Fee).ToCoin(),
+			Fee:              types.Amount(desc.Fee).ToCoin(),
 			Time:             desc.Added.Unix(),
 			Height:           int64(desc.Height),
 			StartingPriority: desc.StartingPriority,

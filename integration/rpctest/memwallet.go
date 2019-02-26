@@ -12,14 +12,15 @@ import (
 	"sync"
 
 	"github.com/endurio/ndrd/blockchain"
-	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
-	"github.com/endurio/ndrd/rpcclient"
-	"github.com/endurio/ndrd/txscript"
-	"github.com/endurio/ndrd/wire"
+	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chainutil"
 	"github.com/endurio/ndrd/chainutil/hdkeychain"
+	"github.com/endurio/ndrd/rpcclient"
+	"github.com/endurio/ndrd/txscript"
+	"github.com/endurio/ndrd/types"
+	"github.com/endurio/ndrd/wire"
 )
 
 var (
@@ -39,7 +40,7 @@ var (
 // maturity period of direct coinbase outputs.
 type utxo struct {
 	pkScript       []byte
-	value          chainutil.Amount
+	value          types.Amount
 	keyIndex       uint32
 	maturityHeight int32
 	isLocked       bool
@@ -272,7 +273,7 @@ func (m *memWallet) evalOutputs(outputs []*wire.TxOut, txHash *chainhash.Hash,
 
 			op := wire.OutPoint{Hash: *txHash, Index: uint32(i)}
 			m.utxos[op] = &utxo{
-				value:          chainutil.Amount(output.Value),
+				value:          types.Amount(output.Value),
 				keyIndex:       keyIndex,
 				maturityHeight: maturityHeight,
 				pkScript:       pkScript,
@@ -381,8 +382,8 @@ func (m *memWallet) NewAddress() (chainutil.Address, error) {
 // change output indicated by the change boolean.
 //
 // NOTE: The memWallet's mutex must be held when this function is called.
-func (m *memWallet) fundTx(tx *wire.MsgTx, amt chainutil.Amount,
-	feeRate chainutil.Amount, change bool) error {
+func (m *memWallet) fundTx(tx *wire.MsgTx, amt types.Amount,
+	feeRate types.Amount, change bool) error {
 
 	const (
 		// spendSize is the largest number of bytes of a sigScript
@@ -391,7 +392,7 @@ func (m *memWallet) fundTx(tx *wire.MsgTx, amt chainutil.Amount,
 	)
 
 	var (
-		amtSelected chainutil.Amount
+		amtSelected types.Amount
 		txSize      int
 	)
 
@@ -414,7 +415,7 @@ func (m *memWallet) fundTx(tx *wire.MsgTx, amt chainutil.Amount,
 		// observing the specified fee rate. If we don't have enough
 		// coins from he current amount selected to pay the fee, then
 		// continue to grab more coins.
-		reqFee := chainutil.Amount(txSize * int(feeRate))
+		reqFee := types.Amount(txSize * int(feeRate))
 		if amtSelected-reqFee < amt {
 			continue
 		}
@@ -451,7 +452,7 @@ func (m *memWallet) fundTx(tx *wire.MsgTx, amt chainutil.Amount,
 // while observing the passed fee rate. The passed fee rate should be expressed
 // in satoshis-per-byte.
 func (m *memWallet) SendOutputs(outputs []*wire.TxOut,
-	feeRate chainutil.Amount) (*chainhash.Hash, error) {
+	feeRate types.Amount) (*chainhash.Hash, error) {
 
 	tx, err := m.CreateTransaction(outputs, feeRate, true)
 	if err != nil {
@@ -465,7 +466,7 @@ func (m *memWallet) SendOutputs(outputs []*wire.TxOut,
 // specified outputs while observing the passed fee rate and ignoring a change
 // output. The passed fee rate should be expressed in sat/b.
 func (m *memWallet) SendOutputsWithoutChange(outputs []*wire.TxOut,
-	feeRate chainutil.Amount) (*chainhash.Hash, error) {
+	feeRate types.Amount) (*chainhash.Hash, error) {
 
 	tx, err := m.CreateTransaction(outputs, feeRate, false)
 	if err != nil {
@@ -482,7 +483,7 @@ func (m *memWallet) SendOutputsWithoutChange(outputs []*wire.TxOut,
 //
 // This function is safe for concurrent access.
 func (m *memWallet) CreateTransaction(outputs []*wire.TxOut,
-	feeRate chainutil.Amount, change bool) (*wire.MsgTx, error) {
+	feeRate types.Amount, change bool) (*wire.MsgTx, error) {
 
 	m.Lock()
 	defer m.Unlock()
@@ -491,9 +492,9 @@ func (m *memWallet) CreateTransaction(outputs []*wire.TxOut,
 
 	// Tally up the total amount to be sent in order to perform coin
 	// selection shortly below.
-	var outputAmt chainutil.Amount
+	var outputAmt types.Amount
 	for _, output := range outputs {
-		outputAmt += chainutil.Amount(output.Value)
+		outputAmt += types.Amount(output.Value)
 		tx.AddTxOut(output)
 	}
 
@@ -563,11 +564,11 @@ func (m *memWallet) UnlockOutputs(inputs []*wire.TxIn) {
 // ConfirmedBalance returns the confirmed balance of the wallet.
 //
 // This function is safe for concurrent access.
-func (m *memWallet) ConfirmedBalance() chainutil.Amount {
+func (m *memWallet) ConfirmedBalance() types.Amount {
 	m.RLock()
 	defer m.RUnlock()
 
-	var balance chainutil.Amount
+	var balance types.Amount
 	for _, utxo := range m.utxos {
 		// Prevent any immature or locked outputs from contributing to
 		// the wallet's total confirmed balance.

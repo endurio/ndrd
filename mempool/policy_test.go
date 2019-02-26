@@ -23,7 +23,7 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 	tests := []struct {
 		name     string         // test description.
 		size     int64          // Transaction size in bytes.
-		relayFee chainutil.Amount // minimum relay transaction fee.
+		relayFee types.Amount // minimum relay transaction fee.
 		want     int64          // Expected fee.
 	}{
 		{
@@ -49,8 +49,8 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 		{
 			"max standard tx size with max satoshi relay fee",
 			maxStandardTxWeight / 4,
-			chainutil.MaxAtom,
-			chainutil.MaxAtom,
+			types.MaxAtom,
+			types.MaxAtom,
 		},
 		{
 			"1500 bytes with 5000 relay fee",
@@ -216,7 +216,7 @@ func TestDust(t *testing.T) {
 	tests := []struct {
 		name     string // test description
 		txOut    wire.TxOut
-		relayFee chainutil.Amount // minimum relay transaction fee.
+		relayFee types.Amount // minimum relay transaction fee.
 		isDust   bool
 	}{
 		{
@@ -248,8 +248,8 @@ func TestDust(t *testing.T) {
 		{
 			// Maximum allowed value is never dust.
 			"max satoshi amount is never dust",
-			wire.TxOut{Value: chainutil.MaxAtom, PkScript: pkScript},
-			chainutil.MaxAtom,
+			wire.TxOut{Value: types.MaxAtom, PkScript: pkScript},
+			types.MaxAtom,
 			false,
 		},
 		{

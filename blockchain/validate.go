@@ -13,11 +13,12 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
-	"github.com/endurio/ndrd/txscript"
+	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chainutil"
+	"github.com/endurio/ndrd/txscript"
+	"github.com/endurio/ndrd/types"
 	"github.com/endurio/ndrd/wire"
 )
 
@@ -43,7 +44,7 @@ const (
 
 	// baseSubsidy is the starting subsidy amount for mined blocks.  This
 	// value is halved every SubsidyHalvingInterval blocks.
-	baseSubsidy = 50 * chainutil.AtomPerCoin
+	baseSubsidy = 50 * types.AtomPerCoin
 )
 
 var (
@@ -245,10 +246,10 @@ func CheckTransactionSanity(tx *chainutil.Tx) error {
 					"value of %v", satoshi)
 				return ruleError(ErrBadTxOutValue, str)
 			}
-			if satoshi > chainutil.MaxAtom {
+			if satoshi > types.MaxAtom {
 				str := fmt.Sprintf("transaction output value of %v is "+
 					"higher than max allowed value of %v", satoshi,
-					chainutil.MaxAtom)
+					types.MaxAtom)
 				return ruleError(ErrBadTxOutValue, str)
 			}
 
@@ -259,14 +260,14 @@ func CheckTransactionSanity(tx *chainutil.Tx) error {
 			if totalSatoshi < 0 {
 				str := fmt.Sprintf("total value of all transaction "+
 					"outputs exceeds max allowed value of %v",
-					chainutil.MaxAtom)
+					types.MaxAtom)
 				return ruleError(ErrBadTxOutValue, str)
 			}
-			if totalSatoshi > chainutil.MaxAtom {
+			if totalSatoshi > types.MaxAtom {
 				str := fmt.Sprintf("total value of all transaction "+
 					"outputs is %v which is higher than max "+
 					"allowed value of %v", totalSatoshi,
-					chainutil.MaxAtom)
+					types.MaxAtom)
 				return ruleError(ErrBadTxOutValue, str)
 			}
 		}
@@ -942,14 +943,14 @@ func CheckTransactionInputs(tx *chainutil.Tx, txHeight int32, utxoView *UtxoView
 		originTxSatoshi := utxo.Amount()
 		if originTxSatoshi < 0 {
 			str := fmt.Sprintf("transaction output has negative "+
-				"value of %v", chainutil.Amount(originTxSatoshi))
+				"value of %v", types.Amount(originTxSatoshi))
 			return nil, ruleError(ErrBadTxOutValue, str)
 		}
-		if originTxSatoshi > chainutil.MaxAtom {
+		if originTxSatoshi > types.MaxAtom {
 			str := fmt.Sprintf("transaction output value of %v is "+
 				"higher than max allowed value of %v",
-				chainutil.Amount(originTxSatoshi),
-				chainutil.MaxAtom)
+				types.Amount(originTxSatoshi),
+				types.MaxAtom)
 			return nil, ruleError(ErrBadTxOutValue, str)
 		}
 
@@ -959,11 +960,11 @@ func CheckTransactionInputs(tx *chainutil.Tx, txHeight int32, utxoView *UtxoView
 		lastSatoshiIn := balances[token]
 		balances[token] -= originTxSatoshi
 		if balances[token] > lastSatoshiIn ||
-			abs(balances[token]) > chainutil.MaxAtom {
+			abs(balances[token]) > types.MaxAtom {
 			str := fmt.Sprintf("total value of all transaction "+
 				"inputs for %v is %v which is higher than max "+
 				"allowed value of %v", token, abs(balances[token]),
-				chainutil.MaxAtom)
+				types.MaxAtom)
 			return nil, ruleError(ErrBadTxOutValue, str)
 		}
 	}

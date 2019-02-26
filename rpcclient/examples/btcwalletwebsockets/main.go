@@ -11,9 +11,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/endurio/ndrd/rpcclient"
-	"github.com/endurio/ndrd/chainutil"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/endurio/ndrd/chainutil"
+	"github.com/endurio/ndrd/rpcclient"
+	"github.com/endurio/ndrd/types"
 )
 
 func main() {
@@ -22,7 +23,7 @@ func main() {
 	// for notifications.  See the documentation of the rpcclient
 	// NotificationHandlers type for more details about each handler.
 	ntfnHandlers := rpcclient.NotificationHandlers{
-		OnAccountBalance: func(account string, balance chainutil.Amount, confirmed bool) {
+		OnAccountBalance: func(account string, balance types.Amount, confirmed bool) {
 			log.Printf("New balance for account %s: %v", account,
 				balance)
 		},

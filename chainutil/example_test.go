@@ -8,13 +8,13 @@ import (
 
 func ExampleAmount() {
 
-	a := chainutil.Amount(0)
+	a := types.Amount(0)
 	fmt.Println("Zero Atom:", a)
 
-	a = chainutil.Amount(1e8)
+	a = types.Amount(1e8)
 	fmt.Println("100,000,000 Satoshis:", a)
 
-	a = chainutil.Amount(1e5)
+	a = types.Amount(1e5)
 	fmt.Println("100,000 Satoshis:", a)
 	// Output:
 	// Zero Atom: 0 BTC
@@ -23,28 +23,28 @@ func ExampleAmount() {
 }
 
 func ExampleNewAmount() {
-	amountOne, err := chainutil.NewAmount(1)
+	amountOne, err := types.NewAmount(1)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	fmt.Println(amountOne) //Output 1
 
-	amountFraction, err := chainutil.NewAmount(0.01234567)
+	amountFraction, err := types.NewAmount(0.01234567)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	fmt.Println(amountFraction) //Output 2
 
-	amountZero, err := chainutil.NewAmount(0)
+	amountZero, err := types.NewAmount(0)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	fmt.Println(amountZero) //Output 3
 
-	amountNaN, err := chainutil.NewAmount(math.NaN())
+	amountNaN, err := types.NewAmount(math.NaN())
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -58,7 +58,7 @@ func ExampleNewAmount() {
 }
 
 func ExampleAmount_unitConversions() {
-	amount := chainutil.Amount(44433322211100)
+	amount := types.Amount(44433322211100)
 
 	fmt.Println("Atom to kBTC:", amount.Format(chainutil.AmountKiloBTC))
 	fmt.Println("Atom to BTC:", amount)

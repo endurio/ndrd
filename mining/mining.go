@@ -14,18 +14,19 @@ import (
 	"time"
 
 	"github.com/endurio/ndrd/blockchain"
-	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
-	"github.com/endurio/ndrd/txscript"
+	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chainutil"
+	"github.com/endurio/ndrd/txscript"
+	"github.com/endurio/ndrd/types"
 	"github.com/endurio/ndrd/wire"
 )
 
 const (
 	// MinHighPriority is the minimum priority value that allows a
 	// transaction to be considered high priority.
-	MinHighPriority = chainutil.AtomPerCoin * 144.0 / 250
+	MinHighPriority = types.AtomPerCoin * 144.0 / 250
 
 	// CoinbaseFlags is added to the coinbase script of a generated block
 	// and is used to monitor BIP16 support as well as blocks that are
@@ -95,10 +96,10 @@ type OdrDesc struct {
 	Bid bool
 
 	// Amount is the total NDR will be bought or sold by the order.
-	Amount chainutil.Amount
+	Amount types.Amount
 
 	// Payout is the total STB will be spent by the order associated with the entry.
-	Payout chainutil.Amount
+	Payout types.Amount
 }
 
 // OdrSource represents a source of orders to consider for inclusion in

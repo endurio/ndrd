@@ -7,8 +7,8 @@ package mining
 
 import (
 	"github.com/endurio/ndrd/blockchain"
+	"github.com/endurio/ndrd/types"
 	"github.com/endurio/ndrd/wire"
-	"github.com/endurio/ndrd/chainutil"
 )
 
 const (
@@ -45,7 +45,7 @@ type Policy struct {
 	// TxMinFreeFee is the minimum fee in Atom/1000 bytes that is
 	// required for a transaction to be treated as free for mining purposes
 	// (block template generation).
-	TxMinFreeFee chainutil.Amount
+	TxMinFreeFee types.Amount
 }
 
 // minInt is a helper function to return the minimum of two ints.  This avoids

@@ -21,17 +21,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/btcsuite/go-socks/socks"
 	"github.com/endurio/ndrd/blockchain"
-	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
+	"github.com/endurio/ndrd/chainec"
+	"github.com/endurio/ndrd/chainutil"
 	"github.com/endurio/ndrd/connmgr"
 	"github.com/endurio/ndrd/database"
 	_ "github.com/endurio/ndrd/database/ffldb"
 	"github.com/endurio/ndrd/mempool"
 	"github.com/endurio/ndrd/peer"
-	"github.com/endurio/ndrd/chainutil"
-	"github.com/btcsuite/go-socks/socks"
+	"github.com/endurio/ndrd/types"
 	flags "github.com/jessevdk/go-flags"
 )
 
@@ -171,7 +172,7 @@ type config struct {
 	dial                 func(string, string, time.Duration) (net.Conn, error)
 	addCheckpoints       []chaincfg.Checkpoint
 	miningKey            *chainec.PrivateKey
-	minRelayTxFee        chainutil.Amount
+	minRelayTxFee        types.Amount
 	whitelists           []*net.IPNet
 }
 
@@ -756,7 +757,7 @@ func loadConfig() (*config, []string, error) {
 	}
 
 	// Validate the the minrelaytxfee.
-	cfg.minRelayTxFee, err = chainutil.NewAmount(cfg.MinRelayTxFee)
+	cfg.minRelayTxFee, err = types.NewAmount(cfg.MinRelayTxFee)
 	if err != nil {
 		str := "%s: invalid minrelaytxfee: %v"
 		err := fmt.Errorf(str, funcName, err)
