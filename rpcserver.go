@@ -556,7 +556,7 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 	params := s.cfg.ChainParams
 	for encodedAddr, amount := range c.Amounts {
 		// Ensure amount is in the valid range for monetary amounts.
-		if amount <= 0 || amount > chainutil.MaxSatoshi {
+		if amount <= 0 || amount > chainutil.MaxAtom {
 			return nil, &chainjson.RPCError{
 				Code:    chainjson.ErrRPCType,
 				Message: "Invalid amount",

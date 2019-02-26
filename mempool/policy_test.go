@@ -49,8 +49,8 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 		{
 			"max standard tx size with max satoshi relay fee",
 			maxStandardTxWeight / 4,
-			chainutil.MaxSatoshi,
-			chainutil.MaxSatoshi,
+			chainutil.MaxAtom,
+			chainutil.MaxAtom,
 		},
 		{
 			"1500 bytes with 5000 relay fee",
@@ -248,8 +248,8 @@ func TestDust(t *testing.T) {
 		{
 			// Maximum allowed value is never dust.
 			"max satoshi amount is never dust",
-			wire.TxOut{Value: chainutil.MaxSatoshi, PkScript: pkScript},
-			chainutil.MaxSatoshi,
+			wire.TxOut{Value: chainutil.MaxAtom, PkScript: pkScript},
+			chainutil.MaxAtom,
 			false,
 		},
 		{

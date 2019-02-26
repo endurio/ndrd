@@ -1265,7 +1265,7 @@ func (sp *serverPeer) enforceNodeBloomFlag(cmd string) bool {
 // disconnected if an invalid fee filter value is provided.
 func (sp *serverPeer) OnFeeFilter(_ *peer.Peer, msg *wire.MsgFeeFilter) {
 	// Check that the passed minimum fee is a valid amount.
-	if msg.MinFee < 0 || msg.MinFee > chainutil.MaxSatoshi {
+	if msg.MinFee < 0 || msg.MinFee > chainutil.MaxAtom {
 		peerLog.Debugf("Peer %v sent an invalid feefilter '%v' -- "+
 			"disconnecting", sp, chainutil.Amount(msg.MinFee))
 		sp.Disconnect()

@@ -6,12 +6,12 @@
 package chainutil
 
 const (
-	// SatoshiPerBitcent is the number of satoshi in one bitcoin cent.
-	SatoshiPerBitcent = 1e6
+	// AtomPerCent is the number of satoshi in one bitcoin cent.
+	AtomPerCent = 1e6
 
 	// AtomPerCoin is the number of satoshi in one bitcoin (1 BTC).
 	AtomPerCoin = 1e8
 
-	// MaxSatoshi is the maximum transaction amount allowed in satoshi.
-	MaxSatoshi = 21e6 * AtomPerCoin
+	// MaxAtom is the maximum transaction amount allowed in satoshi.
+	MaxAtom = 21e6 * AtomPerCoin
 )

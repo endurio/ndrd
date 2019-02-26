@@ -245,10 +245,10 @@ func CheckTransactionSanity(tx *chainutil.Tx) error {
 					"value of %v", satoshi)
 				return ruleError(ErrBadTxOutValue, str)
 			}
-			if satoshi > chainutil.MaxSatoshi {
+			if satoshi > chainutil.MaxAtom {
 				str := fmt.Sprintf("transaction output value of %v is "+
 					"higher than max allowed value of %v", satoshi,
-					chainutil.MaxSatoshi)
+					chainutil.MaxAtom)
 				return ruleError(ErrBadTxOutValue, str)
 			}
 
@@ -259,14 +259,14 @@ func CheckTransactionSanity(tx *chainutil.Tx) error {
 			if totalSatoshi < 0 {
 				str := fmt.Sprintf("total value of all transaction "+
 					"outputs exceeds max allowed value of %v",
-					chainutil.MaxSatoshi)
+					chainutil.MaxAtom)
 				return ruleError(ErrBadTxOutValue, str)
 			}
-			if totalSatoshi > chainutil.MaxSatoshi {
+			if totalSatoshi > chainutil.MaxAtom {
 				str := fmt.Sprintf("total value of all transaction "+
 					"outputs is %v which is higher than max "+
 					"allowed value of %v", totalSatoshi,
-					chainutil.MaxSatoshi)
+					chainutil.MaxAtom)
 				return ruleError(ErrBadTxOutValue, str)
 			}
 		}
@@ -945,11 +945,11 @@ func CheckTransactionInputs(tx *chainutil.Tx, txHeight int32, utxoView *UtxoView
 				"value of %v", chainutil.Amount(originTxSatoshi))
 			return nil, ruleError(ErrBadTxOutValue, str)
 		}
-		if originTxSatoshi > chainutil.MaxSatoshi {
+		if originTxSatoshi > chainutil.MaxAtom {
 			str := fmt.Sprintf("transaction output value of %v is "+
 				"higher than max allowed value of %v",
 				chainutil.Amount(originTxSatoshi),
-				chainutil.MaxSatoshi)
+				chainutil.MaxAtom)
 			return nil, ruleError(ErrBadTxOutValue, str)
 		}
 
@@ -959,11 +959,11 @@ func CheckTransactionInputs(tx *chainutil.Tx, txHeight int32, utxoView *UtxoView
 		lastSatoshiIn := balances[token]
 		balances[token] -= originTxSatoshi
 		if balances[token] > lastSatoshiIn ||
-			abs(balances[token]) > chainutil.MaxSatoshi {
+			abs(balances[token]) > chainutil.MaxAtom {
 			str := fmt.Sprintf("total value of all transaction "+
 				"inputs for %v is %v which is higher than max "+
 				"allowed value of %v", token, abs(balances[token]),
-				chainutil.MaxSatoshi)
+				chainutil.MaxAtom)
 			return nil, ruleError(ErrBadTxOutValue, str)
 		}
 	}
