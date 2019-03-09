@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/endurio/ndrd/chaincfg/chainhash"
+	"github.com/endurio/ndrd/types"
 	"github.com/endurio/ndrd/wire"
 )
 
@@ -437,7 +438,7 @@ func calcHashOutputs(tx *wire.MsgTx) chainhash.Hash {
 // wallet if fed an invalid input amount, the real sighash will differ causing
 // the produced signature to be invalid.
 func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
-	hashType SigHashType, tx *wire.MsgTx, idx int, amt int64) ([]byte, error) {
+	hashType SigHashType, tx *wire.MsgTx, idx int, amt types.Amount) ([]byte, error) {
 
 	// As a sanity check, ensure the passed input index for the transaction
 	// is valid.
@@ -544,7 +545,7 @@ func calcWitnessSignatureHash(subScript []parsedOpcode, sigHashes *TxSigHashes,
 // CalcWitnessSigHash computes the sighash digest for the specified input of
 // the target transaction observing the desired sig hash type.
 func CalcWitnessSigHash(script []byte, sigHashes *TxSigHashes, hType SigHashType,
-	tx *wire.MsgTx, idx int, amt int64) ([]byte, error) {
+	tx *wire.MsgTx, idx int, amt types.Amount) ([]byte, error) {
 
 	parsedScript, err := parseScript(script)
 	if err != nil {
@@ -656,7 +657,7 @@ func calcSignatureHash(script []parsedOpcode, hashType SigHashType, tx *wire.Msg
 
 		// All but current output get zeroed out.
 		for i := 0; i < idx; i++ {
-			txCopy.TxOut[i].Value = -1
+			txCopy.TxOut[i].Value = types.ValueInvalid
 			txCopy.TxOut[i].PkScript = nil
 		}
 

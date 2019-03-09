@@ -13,6 +13,7 @@ import (
 	"math/big"
 
 	"github.com/endurio/ndrd/chainec"
+	"github.com/endurio/ndrd/types"
 	"github.com/endurio/ndrd/wire"
 )
 
@@ -136,7 +137,7 @@ type Engine struct {
 	savedFirstStack [][]byte // stack from first script for bip16 scripts
 	witnessVersion  int
 	witnessProgram  []byte
-	inputAmount     int64
+	inputAmount     types.Amount
 }
 
 // hasFlag returns whether the script engine instance has the passed flag set.
@@ -854,7 +855,7 @@ func (vm *Engine) SetAltStack(data [][]byte) {
 // transaction, and input index.  The flags modify the behavior of the script
 // engine according to the description provided by each flag.
 func NewEngine(scriptPubKey []byte, tx *wire.MsgTx, txIdx int, flags ScriptFlags,
-	sigCache *SigCache, hashCache *TxSigHashes, inputAmount int64) (*Engine, error) {
+	sigCache *SigCache, hashCache *TxSigHashes, inputAmount types.Amount) (*Engine, error) {
 
 	// The provided transaction input index must refer to a valid input.
 	if txIdx < 0 || txIdx >= len(tx.TxIn) {

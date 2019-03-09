@@ -9,10 +9,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chaincfg"
-	"github.com/endurio/ndrd/wire"
+	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chainutil"
+	"github.com/endurio/ndrd/types"
+	"github.com/endurio/ndrd/wire"
 )
 
 // RawTxInWitnessSignature returns the serialized ECDA signature for the input
@@ -20,7 +21,7 @@ import (
 // function is identical to RawTxInSignature, however the signature generated
 // signs a new sighash digest defined in BIP0143.
 func RawTxInWitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
-	amt int64, subScript []byte, hashType SigHashType,
+	amt types.Amount, subScript []byte, hashType SigHashType,
 	key *chainec.PrivateKey) ([]byte, error) {
 
 	parsedScript, err := parseScript(subScript)
@@ -47,7 +48,7 @@ func RawTxInWitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int,
 // template. The passed transaction must contain all the inputs and outputs as
 // dictated by the passed hashType. The signature generated observes the new
 // transaction digest algorithm defined within BIP0143.
-func WitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int, amt int64,
+func WitnessSignature(tx *wire.MsgTx, sigHashes *TxSigHashes, idx int, amt types.Amount,
 	subscript []byte, hashType SigHashType, privKey *chainec.PrivateKey,
 	compress bool) (wire.TxWitness, error) {
 
