@@ -20,46 +20,46 @@ func NewBalance(a0, a1 Amount) *Balance {
 	return &Balance{a0, a1}
 }
 
-func (v Balance) Map() []Amount {
-	return []Amount{v.a0, v.a1}
+func (b Balance) Map() []Amount {
+	return []Amount{b.a0, b.a1}
 }
 
-func (v Balance) Amount(token Token) Amount {
+func (b Balance) Amount(token Token) Amount {
 	if token == Token0 {
-		return v.a0
+		return b.a0
 	}
-	return v.a1
+	return b.a1
 }
 
-func (v *Balance) SetAmount(token Token, amount Amount) {
+func (b *Balance) SetAmount(token Token, amount Amount) {
 	if token == Token0 {
-		v.a0 = amount
+		b.a0 = amount
 	} else {
-		v.a1 = amount
+		b.a1 = amount
 	}
 }
 
-func (v *Balance) Clone() *Balance {
-	return &Balance{v.a0, v.a1}
+func (b *Balance) Clone() *Balance {
+	return &Balance{b.a0, b.a1}
 }
 
-func (v Balance) Big() *BigBalance {
+func (b Balance) Big() *BigBalance {
 	var bv BigBalance
-	bv.a0.SetUint64(uint64(v.a0))
-	bv.a1.SetUint64(uint64(v.a1))
+	bv.a0.SetUint64(uint64(b.a0))
+	bv.a1.SetUint64(uint64(b.a1))
 	return &bv
 }
 
-func (v *Balance) Add(Balance *Balance) *Balance {
-	v.a0 += Balance.a0
-	v.a1 += Balance.a1
-	return v
+func (b *Balance) Add(balance *Balance) *Balance {
+	b.a0 += balance.a0
+	b.a1 += balance.a1
+	return b
 }
 
-func (v *Balance) Sub(Balance *Balance) *Balance {
-	v.a0 -= Balance.a0
-	v.a1 -= Balance.a1
-	return v
+func (b *Balance) Sub(balance *Balance) *Balance {
+	b.a0 -= balance.a0
+	b.a1 -= balance.a1
+	return b
 }
 
 type BigBalance struct {
@@ -70,21 +70,21 @@ var (
 	BigBalanceEmtpy = BigBalance{}
 )
 
-func (v *BigBalance) Clone() *BigBalance {
+func (b *BigBalance) Clone() *BigBalance {
 	var bv BigBalance
-	bv.a0.Set(&v.a0)
-	bv.a1.Set(&v.a1)
+	bv.a0.Set(&b.a0)
+	bv.a1.Set(&b.a1)
 	return &bv
 }
 
-func (v *BigBalance) Add(Balance *BigBalance) *BigBalance {
-	v.a0.Add(&v.a0, &Balance.a0)
-	v.a1.Add(&v.a1, &Balance.a1)
-	return v
+func (b *BigBalance) Add(Balance *BigBalance) *BigBalance {
+	b.a0.Add(&b.a0, &Balance.a0)
+	b.a1.Add(&b.a1, &Balance.a1)
+	return b
 }
 
-func (v *BigBalance) Sub(Balance *BigBalance) *BigBalance {
-	v.a0.Sub(&v.a0, &Balance.a0)
-	v.a1.Sub(&v.a1, &Balance.a1)
-	return v
+func (b *BigBalance) Sub(Balance *BigBalance) *BigBalance {
+	b.a0.Sub(&b.a0, &Balance.a0)
+	b.a1.Sub(&b.a1, &Balance.a1)
+	return b
 }
