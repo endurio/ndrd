@@ -10,9 +10,10 @@ import (
 	"math/big"
 
 	"github.com/endurio/ndrd/chaincfg/chainhash"
+	"github.com/endurio/ndrd/chainutil"
 	"github.com/endurio/ndrd/database"
 	"github.com/endurio/ndrd/txscript"
-	"github.com/endurio/ndrd/chainutil"
+	"github.com/endurio/ndrd/types"
 	"github.com/endurio/ndrd/wire"
 )
 
@@ -30,6 +31,9 @@ const (
 	// tfModified indicates that a txout has been modified since it was
 	// loaded.
 	tfModified
+
+	// tfToken encode the txout token id.
+	tfToken
 )
 
 // UtxoEntry houses details about an individual transaction output in a utxo
@@ -43,7 +47,7 @@ type UtxoEntry struct {
 	// specifically crafted to result in minimal padding.  There will be a
 	// lot of these in memory, so a few extra bytes of padding adds up.
 
-	amount      int64
+	amount      types.Amount
 	pkScript    []byte // The public key script for the output.
 	blockHeight int32  // Height of block containing tx.
 
@@ -58,6 +62,11 @@ type UtxoEntry struct {
 // loaded.
 func (entry *UtxoEntry) isModified() bool {
 	return entry.packedFlags&tfModified == tfModified
+}
+
+// Token returns the token of the output.
+func (entry *UtxoEntry) Token() types.Token {
+	return types.Token(entry.packedFlags & tfToken)
 }
 
 // IsCoinBase returns whether or not the output was contained in a coinbase
@@ -90,18 +99,13 @@ func (entry *UtxoEntry) Spend() {
 }
 
 // Amount returns the amount of the output.
-func (entry *UtxoEntry) Amount() int64 {
+func (entry *UtxoEntry) Amount() types.Amount {
 	return entry.amount
 }
 
 // PkScript returns the public key script for the output.
 func (entry *UtxoEntry) PkScript() []byte {
 	return entry.pkScript
-}
-
-// TokenID returns the identity of the output token.
-func (entry *UtxoEntry) TokenID() wire.TokenIdentity {
-	return wire.TokenID(entry.pkScript)
 }
 
 // Clone returns a shallow copy of the utxo entry.
@@ -170,12 +174,15 @@ func (view *UtxoViewpoint) addTxOut(outpoint wire.OutPoint, txOut *wire.TxOut, i
 		view.entries[outpoint] = entry
 	}
 
-	entry.amount = txOut.Value
+	entry.amount = txOut.Value.Amount
 	entry.pkScript = txOut.PkScript
 	entry.blockHeight = blockHeight
 	entry.packedFlags = tfModified
 	if isCoinBase {
 		entry.packedFlags |= tfCoinBase
+	}
+	if txOut.Value.Token != types.Token0 {
+		entry.packedFlags |= tfToken
 	}
 }
 
@@ -202,7 +209,7 @@ func (view *UtxoViewpoint) AddTxOut(tx *chainutil.Tx, txOutIdx uint32, blockHeig
 // unspendable to the view.  When the view already has entries for any of the
 // outputs, they are simply marked unspent.  All fields will be updated for
 // existing entries since it's possible it has changed during a reorg.
-func (view *UtxoViewpoint) AddTxOuts(tx *chainutil.Tx, blockHeight int32) (totalSTB int64) {
+func (view *UtxoViewpoint) AddTxOuts(tx *chainutil.Tx, blockHeight int32) (totalSTB types.Amount) {
 	// Loop all of the transaction outputs and add those which are not
 	// provably unspendable.
 	isCoinBase := IsCoinBase(tx)
@@ -215,9 +222,9 @@ func (view *UtxoViewpoint) AddTxOuts(tx *chainutil.Tx, blockHeight int32) (total
 		// transaction is fully spent.
 		prevOut.Index = uint32(txOutIdx)
 		view.addTxOut(prevOut, txOut, isCoinBase, blockHeight)
-		if txOut.TokenID() == wire.STB {
+		if txOut.Value.Token == types.Token1 {
 			// Ignore overflow since tx already passes all the validations.
-			totalSTB += txOut.Value
+			totalSTB += txOut.Value.Amount
 		}
 	}
 	return totalSTB
@@ -229,7 +236,7 @@ func (view *UtxoViewpoint) AddTxOuts(tx *chainutil.Tx, blockHeight int32) (total
 // to append an entry for each spent txout.  An error will be returned if the
 // view does not contain the required utxos.
 func (view *UtxoViewpoint) connectTransaction(tx *chainutil.Tx, blockHeight int32,
-	stxos *[]SpentTxOut) (balance int64, err error) {
+	stxos *[]SpentTxOut) (balance types.Amount, err error) {
 	// Coinbase transactions don't have any inputs to spend.
 	if IsCoinBase(tx) {
 		// Add the transaction's outputs as available utxos.
@@ -267,7 +274,7 @@ func (view *UtxoViewpoint) connectTransaction(tx *chainutil.Tx, blockHeight int3
 		entry.Spend()
 
 		// Ignore overflow since tx already passes all the validations.
-		if entry.TokenID() == wire.STB {
+		if entry.Token() == types.Token1 {
 			balance -= entry.Amount()
 		}
 	}
@@ -290,7 +297,7 @@ func (view *UtxoViewpoint) connectTransactions(block *chainutil.Block, stxos *[]
 		if err != nil {
 			return nil, err
 		}
-		totalBalance.Add(totalBalance, big.NewInt(balance))
+		totalBalance.Add(totalBalance, balance.BigInt())
 	}
 
 	// Update the best hash for view to include this block since all of its
@@ -373,10 +380,13 @@ func (view *UtxoViewpoint) disconnectTransactions(db database.DB, block *chainut
 			entry := view.entries[prevOut]
 			if entry == nil {
 				entry = &UtxoEntry{
-					amount:      txOut.Value,
+					amount:      txOut.Value.Amount,
 					pkScript:    txOut.PkScript,
 					blockHeight: block.Height(),
 					packedFlags: packedFlags,
+				}
+				if txOut.Value.Token != types.Token0 {
+					entry.packedFlags |= tfToken
 				}
 
 				view.entries[prevOut] = entry

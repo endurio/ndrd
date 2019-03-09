@@ -633,7 +633,7 @@ func utxoEntryHeaderCode(entry *UtxoEntry) (uint64, error) {
 	// encodes the height shifted over one bit and the coinbase flag in the
 	// lowest bit.
 	headerCode := uint64(entry.BlockHeight()) << 2
-	if entry.IsToken() {
+	if entry.Token() != types.Token0 {
 		headerCode |= 0x02
 	}
 	if entry.IsCoinBase() {
