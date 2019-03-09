@@ -13,8 +13,9 @@ import (
 	"math"
 	"time"
 
-	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
+	"github.com/endurio/ndrd/chainec"
+	"github.com/endurio/ndrd/types"
 )
 
 const (
@@ -381,6 +382,22 @@ func readElement(r io.Reader, element interface{}) error {
 		}
 		*e = RejectCode(rv)
 		return nil
+
+	case *types.Value:
+		var amount uint64
+		var err error
+		if amount, err = binarySerializer.Uint64(r, littleEndian); err != nil {
+			return err
+		}
+		var token uint8
+		if token, err = binarySerializer.Uint8(r); err != nil {
+			return err
+		}
+		*e = types.Value{
+			types.Amount(amount),
+			types.Token(token),
+		}
+		return nil
 	}
 
 	// Fall back to the slower binary.Read if a fast path was not available
@@ -528,6 +545,15 @@ func writeElement(w io.Writer, element interface{}) error {
 	case RejectCode:
 		err := binarySerializer.PutUint8(w, uint8(e))
 		if err != nil {
+			return err
+		}
+		return nil
+
+	case types.Value:
+		if err := binarySerializer.PutUint64(w, littleEndian, uint64(e.Amount)); err != nil {
+			return err
+		}
+		if err := binarySerializer.PutUint8(w, uint8(e.Token)); err != nil {
 			return err
 		}
 		return nil

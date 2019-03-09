@@ -12,6 +12,7 @@ import (
 	"strconv"
 
 	"github.com/endurio/ndrd/chaincfg/chainhash"
+	"github.com/endurio/ndrd/types"
 )
 
 const (
@@ -1003,8 +1004,7 @@ func readTxOut(r io.Reader, pver uint32, version int32, to *TxOut) error {
 // NOTE: This function is exported in order to allow txscript to compute the
 // new sighashes for witness transactions (BIP0143).
 func WriteTxOut(w io.Writer, pver uint32, version int32, to *TxOut) error {
-	err := binarySerializer.PutUint64(w, littleEndian, uint64(to.Value))
-	if err != nil {
+	if err := writeElement(w, to.Value); err != nil {
 		return err
 	}
 
