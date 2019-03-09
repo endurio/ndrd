@@ -8,6 +8,7 @@ package types
 import (
 	"errors"
 	"math"
+	"math/big"
 	"strconv"
 )
 
@@ -120,4 +121,16 @@ func (a Amount) String() string {
 // a fee by multiplying by a percentage).
 func (a Amount) MulF64(f float64) Amount {
 	return round(float64(a) * f)
+}
+
+func (a Amount) BigInt() *big.Int {
+	return big.NewInt(int64(a))
+}
+
+func (a Amount) Int64() int64 {
+	return int64(a)
+}
+
+func (a Amount) Uint64() uint64 {
+	return uint64(a)
 }
