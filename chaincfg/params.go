@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/endurio/ndrd/chaincfg/chainhash"
+	"github.com/endurio/ndrd/types"
 	"github.com/endurio/ndrd/wire"
 )
 
@@ -21,11 +22,13 @@ const (
 	epochTimeSpan = time.Hour * 24 * 7 / mvpTimeRate
 	blockPerEpoch = 1024 * 4
 	blockTime     = epochTimeSpan / blockPerEpoch
+)
 
-	// PreminedSTB defines the premined amount of STB.
-	PreminedSTB = 1000 * 1e6 // types.AtomPerCoin
+var (
 	// PreminedNDR defines the premined amount of NDR.
-	PreminedNDR = 130056556740610 // ~ 130 mil NDR
+	PreminedNDR = types.Value{130056556740610, types.Token0} // ~ 130 mil NDR
+	// PreminedSTB defines the premined amount of STB.
+	PreminedSTB = types.Value{1000 * 1e6, types.Token1} // types.AtomPerCoin
 )
 
 // These variables are the chain proof-of-work limit parameters for each default
