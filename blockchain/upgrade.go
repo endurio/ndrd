@@ -14,6 +14,7 @@ import (
 
 	"github.com/endurio/ndrd/chaincfg/chainhash"
 	"github.com/endurio/ndrd/database"
+	"github.com/endurio/ndrd/types"
 	"github.com/endurio/ndrd/wire"
 )
 
@@ -424,7 +425,7 @@ func deserializeUtxoEntryV0(serialized []byte) (map[uint32]*UtxoEntry, error) {
 
 		// Create a new utxo entry with the details deserialized above.
 		entries[outputIndex] = &UtxoEntry{
-			amount:      int64(amount),
+			amount:      types.Amount(amount),
 			pkScript:    pkScript,
 			blockHeight: int32(blockHeight),
 			packedFlags: packedFlags,

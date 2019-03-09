@@ -15,8 +15,9 @@ import (
 
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
-	"github.com/endurio/ndrd/database"
 	"github.com/endurio/ndrd/chainutil"
+	"github.com/endurio/ndrd/database"
+	"github.com/endurio/ndrd/types"
 	"github.com/endurio/ndrd/wire"
 )
 
@@ -245,7 +246,7 @@ func dbFetchOrCreateVersion(dbTx database.Tx, key []byte, defaultVersion uint32)
 // transaction.
 type SpentTxOut struct {
 	// Amount is the amount of the output.
-	Amount int64
+	Amount types.Amount
 
 	// PkScipt is the the public key script for the output.
 	PkScript []byte
@@ -255,11 +256,9 @@ type SpentTxOut struct {
 
 	// Denotes if the creating tx is a coinbase.
 	IsCoinBase bool
-}
 
-// TokenID returns the identity of the token for the output
-func (stxo *SpentTxOut) TokenID() wire.TokenIdentity {
-	return wire.TokenID(stxo.PkScript)
+	// Denotes if the output is not Token0 type.
+	IsToken bool
 }
 
 // FetchSpendJournal attempts to retrieve the spend journal, or the set of
@@ -292,7 +291,10 @@ func spentTxOutHeaderCode(stxo *SpentTxOut) uint64 {
 	// As described in the serialization format comments, the header code
 	// encodes the height shifted over one bit and the coinbase flag in the
 	// lowest bit.
-	headerCode := uint64(stxo.Height) << 1
+	headerCode := uint64(stxo.Height) << 2
+	if stxo.IsToken {
+		headerCode |= 0x02
+	}
 	if stxo.IsCoinBase {
 		headerCode |= 0x01
 	}
@@ -349,9 +351,11 @@ func decodeSpentTxOut(serialized []byte, stxo *SpentTxOut) (int, error) {
 	// Decode the header code.
 	//
 	// Bit 0 indicates containing transaction is a coinbase.
-	// Bits 1-x encode height of containing transaction.
+	// Bit 1 indicates the token is not Token0.
+	// Bits 2-x encode height of containing transaction.
 	stxo.IsCoinBase = code&0x01 != 0
-	stxo.Height = int32(code >> 1)
+	stxo.IsToken = code&0x02 != 0
+	stxo.Height = int32(code >> 2)
 	if stxo.Height > 0 {
 		// The legacy v1 spend journal format conditionally tracked the
 		// containing transaction version when the height was non-zero,
@@ -372,7 +376,7 @@ func decodeSpentTxOut(serialized []byte, stxo *SpentTxOut) (int, error) {
 		return offset, errDeserialize(fmt.Sprintf("unable to decode "+
 			"txout: %v", err))
 	}
-	stxo.Amount = int64(amount)
+	stxo.Amount = types.Amount(amount)
 	stxo.PkScript = pkScript
 	return offset, nil
 }
@@ -628,7 +632,10 @@ func utxoEntryHeaderCode(entry *UtxoEntry) (uint64, error) {
 	// As described in the serialization format comments, the header code
 	// encodes the height shifted over one bit and the coinbase flag in the
 	// lowest bit.
-	headerCode := uint64(entry.BlockHeight()) << 1
+	headerCode := uint64(entry.BlockHeight()) << 2
+	if entry.IsToken() {
+		headerCode |= 0x02
+	}
 	if entry.IsCoinBase() {
 		headerCode |= 0x01
 	}
@@ -677,9 +684,11 @@ func deserializeUtxoEntry(serialized []byte) (*UtxoEntry, error) {
 	// Decode the header code.
 	//
 	// Bit 0 indicates whether the containing transaction is a coinbase.
-	// Bits 1-x encode height of containing transaction.
+	// Bit 1 indicates the token is not Token0.
+	// Bits 2-x encode height of containing transaction.
 	isCoinBase := code&0x01 != 0
-	blockHeight := int32(code >> 1)
+	isToken := code&0x02 != 0
+	blockHeight := int32(code >> 2)
 
 	// Decode the compressed unspent transaction output.
 	amount, pkScript, _, err := decodeCompressedTxOut(serialized[offset:])
@@ -689,13 +698,16 @@ func deserializeUtxoEntry(serialized []byte) (*UtxoEntry, error) {
 	}
 
 	entry := &UtxoEntry{
-		amount:      int64(amount),
+		amount:      types.Amount(amount),
 		pkScript:    pkScript,
 		blockHeight: blockHeight,
 		packedFlags: 0,
 	}
 	if isCoinBase {
 		entry.packedFlags |= tfCoinBase
+	}
+	if isToken {
+		entry.packedFlags |= tfToken
 	}
 
 	return entry, nil
@@ -1068,7 +1080,7 @@ func (b *BlockChain) createChainState() error {
 	blockWeight := uint64(GetBlockWeight(genesisBlock))
 	b.stateSnapshot = newBestState(node, blockSize, blockWeight, numTxns,
 		numTxns, time.Unix(node.timestamp, 0),
-		big.NewInt(chaincfg.PreminedSTB))
+		chaincfg.PreminedSTB.Amount.BigInt())
 
 	// Create the initial the database chain state including creating the
 	// necessary index buckets and inserting the genesis block.
