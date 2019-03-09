@@ -260,66 +260,8 @@ func (t TxWitness) SerializeSize() int {
 
 // TxOut defines a bitcoin transaction output.
 type TxOut struct {
-	Value    int64
+	Value    types.Value
 	PkScript []byte
-}
-
-// TokenIdentity defines a token identity
-type TokenIdentity bool
-
-// STB defines token identity for Stabilio
-const (
-	OP_TOKEN = 0xb8 // 184 - AKA OP_NOP9
-	OP_NDR   = 0xb9 // 185 - AKA OP_NOP10
-
-	STB TokenIdentity = false // Stablio
-	NDR TokenIdentity = true  // Endurio
-)
-
-// String returns an unique name in byte slice
-func (tokenID TokenIdentity) String() string {
-	if tokenID == NDR {
-		return "NDR"
-	}
-	return "STB"
-}
-
-// TokenID returns the token identity recorded in the PkScript
-func TokenID(pkScript []byte) TokenIdentity {
-	if beginsWithNDR(pkScript) {
-		return NDR
-	}
-	return STB
-}
-
-// StripTokenID strips the prepended token opcode and data
-func StripTokenID(pkScript []byte) []byte {
-	if beginsWithNDR(pkScript) {
-		return pkScript[1:]
-	}
-	return pkScript
-}
-
-// SwapToken ...
-func SwapToken(pkScript []byte) []byte {
-	if beginsWithNDR(pkScript) {
-		return pkScript[1:]
-	}
-	return prepend(OP_NDR, pkScript)
-}
-
-func beginsWithNDR(pkScript []byte) bool {
-	return len(pkScript) > 0 && pkScript[0] == OP_NDR
-}
-
-// TokenID returns the token identity recorded in the TxOut
-func (t *TxOut) TokenID() TokenIdentity {
-	return TokenID(t.PkScript)
-}
-
-// SwapToken ...
-func (t *TxOut) SwapToken() {
-	t.PkScript = SwapToken(t.PkScript)
 }
 
 // SerializeSize returns the number of bytes it would take to serialize the
@@ -332,19 +274,7 @@ func (t *TxOut) SerializeSize() int {
 
 // NewTxOut returns a new bitcoin transaction output with the provided
 // transaction value and public key script.
-func NewTxOut(value int64, pkScript []byte) *TxOut {
-	return &TxOut{
-		Value:    value,
-		PkScript: pkScript,
-	}
-}
-
-// NewTxOutToken returns a new bitcoin transaction output with the provided
-// transaction value, public key script and token identity.
-func NewTxOutToken(value int64, pkScript []byte, tokenID TokenIdentity) *TxOut {
-	if tokenID == NDR {
-		pkScript = prepend(OP_NDR, pkScript)
-	}
+func NewTxOut(value types.Value, pkScript []byte) *TxOut {
 	return &TxOut{
 		Value:    value,
 		PkScript: pkScript,

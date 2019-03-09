@@ -15,8 +15,8 @@ import (
 
 	"golang.org/x/crypto/ripemd160"
 
-	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
+	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/wire"
 )
 
@@ -295,9 +295,6 @@ const (
 	OP_PUBKEYHASH          = 0xfd // 253 - bitcoin core internal
 	OP_PUBKEY              = 0xfe // 254 - bitcoin core internal
 	OP_INVALIDOPCODE       = 0xff // 255 - bitcoin core internal
-
-	OP_TOKEN = wire.OP_TOKEN // 184 - AKA OP_NOP9
-	OP_NDR   = wire.OP_NDR   // 185 - AKA OP_NOP10
 )
 
 // Conditional execution constants.
