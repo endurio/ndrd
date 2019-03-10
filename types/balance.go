@@ -4,7 +4,10 @@
 
 package types
 
-import "math/big"
+import (
+	"fmt"
+	"math/big"
+)
 
 // Balance contains all Balances carried by an tx output.
 // Acts like a map of token => amount, but practically almost always a single to 2 tokens array.
@@ -39,15 +42,39 @@ func (b *Balance) SetAmount(token Token, amount Amount) {
 	}
 }
 
+func (b *Balance) Value(token Token) Value {
+	if token == Token0 {
+		return Value{b.a0, Token0}
+	}
+	return Value{b.a1, Token1}
+}
+
 func (b *Balance) Clone() *Balance {
 	return &Balance{b.a0, b.a1}
 }
 
-func (b Balance) Big() *BigBalance {
-	var bv BigBalance
-	bv.a0.SetUint64(uint64(b.a0))
-	bv.a1.SetUint64(uint64(b.a1))
-	return &bv
+func (b *Balance) AddValue(v Value) *Balance {
+	switch v.Token {
+	case Token0:
+		b.a0 += v.Amount
+	case Token1:
+		b.a1 += v.Amount
+	default:
+		panic(fmt.Sprintf("Unknown Token: %v", v.Token))
+	}
+	return b
+}
+
+func (b *Balance) SubValue(v Value) *Balance {
+	switch v.Token {
+	case Token0:
+		b.a0 -= v.Amount
+	case Token1:
+		b.a1 -= v.Amount
+	default:
+		panic(fmt.Sprintf("Unknown Token: %v", v.Token))
+	}
+	return b
 }
 
 func (b *Balance) Add(balance *Balance) *Balance {
@@ -60,6 +87,31 @@ func (b *Balance) Sub(balance *Balance) *Balance {
 	b.a0 -= balance.a0
 	b.a1 -= balance.a1
 	return b
+}
+
+// RangeCheck checks whether the value is in it's valid range.
+// Returns 0 for a valid range, negative for lower than minimum,
+// and positive value for higher than maximum.
+func (b *Balance) RangeCheck() int {
+	var check int
+	if b.a0 < 0 {
+		check = -1
+	} else if b.a0 > MaxAtom {
+		check = 1
+	}
+	if b.a1 < 0 {
+		check += -2
+	} else if b.a1 > MaxAtom {
+		check += 2
+	}
+	return check
+}
+
+func (b Balance) Big() *BigBalance {
+	var bv BigBalance
+	bv.a0.SetUint64(uint64(b.a0))
+	bv.a1.SetUint64(uint64(b.a1))
+	return &bv
 }
 
 type BigBalance struct {

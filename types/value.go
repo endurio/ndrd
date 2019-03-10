@@ -12,3 +12,16 @@ type Value struct {
 var (
 	ValueInvalid = Value{-1, TokenInvalid}
 )
+
+// RangeCheck checks whether the value is in it's valid range.
+// Returns 0 for a valid range, negative for lower than minimum,
+// and positive value for higher than maximum.
+func (v *Value) RangeCheck() int {
+	if v.Amount < 0 {
+		return -1
+	}
+	if v.Amount > MaxAtom {
+		return 1
+	}
+	return 0
+}

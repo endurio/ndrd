@@ -233,43 +233,37 @@ func CheckTransactionSanity(tx *chainutil.Tx) error {
 	// restrictions.  All amounts in a transaction are in a unit value known
 	// as a satoshi.  One bitcoin is a quantity of satoshi as defined by the
 	// AtomPerCoin constant.
-	for _, token := range []wire.TokenIdentity{wire.STB, wire.NDR} {
-		var totalSatoshi int64
-		for _, txOut := range msgTx.TxOut {
-			if token != txOut.TokenID() {
-				continue
-			}
+	var totalBalance types.Balance
+	for _, txOut := range msgTx.TxOut {
+		value := txOut.Value
 
-			satoshi := txOut.Value
-			if satoshi < 0 {
-				str := fmt.Sprintf("transaction output has negative "+
-					"value of %v", satoshi)
-				return ruleError(ErrBadTxOutValue, str)
-			}
-			if satoshi > types.MaxAtom {
-				str := fmt.Sprintf("transaction output value of %v is "+
-					"higher than max allowed value of %v", satoshi,
-					types.MaxAtom)
-				return ruleError(ErrBadTxOutValue, str)
-			}
+		if check := value.RangeCheck(); check < 0 {
+			str := fmt.Sprintf("transaction output has negative "+
+				"value of %v", value.Amount)
+			return ruleError(ErrBadTxOutValue, str)
+		} else if check > 0 {
+			str := fmt.Sprintf("transaction output value of %v is "+
+				"higher than max allowed value of %v", value.Amount,
+				types.MaxAtom)
+			return ruleError(ErrBadTxOutValue, str)
+		}
 
-			// Two's complement int64 overflow guarantees that any overflow
-			// is detected and reported.  This is impossible for Bitcoin, but
-			// perhaps possible if an alt increases the total money supply.
-			totalSatoshi += satoshi
-			if totalSatoshi < 0 {
-				str := fmt.Sprintf("total value of all transaction "+
-					"outputs exceeds max allowed value of %v",
-					types.MaxAtom)
-				return ruleError(ErrBadTxOutValue, str)
-			}
-			if totalSatoshi > types.MaxAtom {
-				str := fmt.Sprintf("total value of all transaction "+
-					"outputs is %v which is higher than max "+
-					"allowed value of %v", totalSatoshi,
-					types.MaxAtom)
-				return ruleError(ErrBadTxOutValue, str)
-			}
+		// Two's complement int64 overflow guarantees that any overflow
+		// is detected and reported.  This is impossible for Bitcoin, but
+		// perhaps possible if an alt increases the total money supply.
+		totalBalance.AddValue(value)
+
+		if check := totalBalance.RangeCheck(); check < 0 {
+			str := fmt.Sprintf("total value of all transaction "+
+				"outputs exceeds max allowed value of %v",
+				types.MaxAtom)
+			return ruleError(ErrBadTxOutValue, str)
+		} else if check > 0 {
+			str := fmt.Sprintf("total value of all transaction "+
+				"outputs is %v which is higher than max "+
+				"allowed value of %v", totalBalance,
+				types.MaxAtom)
+			return ruleError(ErrBadTxOutValue, str)
 		}
 	}
 
