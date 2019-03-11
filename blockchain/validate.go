@@ -1096,19 +1096,20 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *chainutil.Block,
 	// still relatively cheap as compared to running the scripts) checks
 	// against all the inputs when the signature operations are out of
 	// bounds.
-	var totalTxBalances types.Balance // blockBalance
+	var blockBalance types.Balance
 	for _, tx := range transactions {
-		balances, err := CheckTransactionInputs(tx, node.height, view,
+		txBalance, err := CheckTransactionInputs(tx, node.height, view,
 			b.chainParams)
 		if err != nil {
 			return err
 		}
 
-		balanceSTB := balances.Amount(types.Token1)
+		txBalance0 := txBalance.Amount(types.Token0)
+		txBalance1 := txBalance.Amount(types.Token1)
 
 		if IsCoinBase(tx) {
-			// coinbase tx doesnot count to totalTxBalances (fee)
-		} else if balanceSTB > 0 || balances.Amount(types.Token0) > 0 {
+			// coinbase tx doesnot count to blockBalance (fee)
+		} else if txBalance1 > 0 || txBalance0 > 0 {
 			// filled order count to accAbsorption instead
 			absnSign := absorption.Sign()
 			if absorption == nil || absnSign == 0 {
@@ -1117,19 +1118,19 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *chainutil.Block,
 					Description: "Order cannot be mined when there is no absorption.",
 				}
 			}
-			if (absnSign > 0) != (balanceSTB > 0) {
+			if (absnSign > 0) != (txBalance1 > 0) {
 				return RuleError{
 					ErrorCode:   ErrBadAbsorption,
 					Description: "Wrong order direction to mine.",
 				}
 			}
-			if (balanceSTB > 0) == (balances.Amount(types.Token0) > 0) {
+			if (txBalance1 > 0) == (txBalance0 > 0) {
 				return RuleError{
 					ErrorCode:   ErrBadAbsorption,
 					Description: "Invalid order: one token must be exchanged for the other.",
 				}
 			}
-			accAbsorption.Add(accAbsorption, balanceSTB.BigInt())
+			accAbsorption.Add(accAbsorption, txBalance1.BigInt())
 			if accAbsorption.Cmp(absorption) == absnSign {
 				return RuleError{
 					ErrorCode:   ErrBadAbsorption,
@@ -1137,7 +1138,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *chainutil.Block,
 				}
 			}
 		} else {
-			if err := totalTxBalances.SafeAdd(balances); err != nil {
+			if err := blockBalance.SafeAdd(txBalance); err != nil {
 				return err
 			}
 		}
@@ -1157,16 +1158,16 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *chainutil.Block,
 	// mining the block.  It is safe to ignore overflow and out of range
 	// errors here because those error conditions would have already been
 	// caught by checkTransactionSanity.
-	var totalSatoshiOut types.Balance
+	var cbActualBalance types.Balance
 	for _, txOut := range transactions[0].MsgTx().TxOut {
-		totalSatoshiOut.AddValue(txOut.Value)
+		cbActualBalance.AddValue(txOut.Value)
 	}
 
-	expectedCoinbaseBalance := totalTxBalances.Clone().Neg()
-	expectedCoinbaseBalance.Add(CalcBlockSubsidy(node.height, b.chainParams))
-	if !expectedCoinbaseBalance.Cover(&totalSatoshiOut) {
+	cbExpectedBalance := blockBalance.Clone().Neg()
+	cbExpectedBalance.Add(CalcBlockSubsidy(node.height, b.chainParams))
+	if !cbExpectedBalance.Cover(&cbActualBalance) {
 		str := fmt.Sprintf("coinbase transaction block pays %v which is more than expected value of %v",
-			totalSatoshiOut, expectedCoinbaseBalance)
+			cbActualBalance, cbExpectedBalance)
 		return ruleError(ErrBadCoinbaseValue, str)
 	}
 
