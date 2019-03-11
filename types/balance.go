@@ -49,6 +49,10 @@ func (b *Balance) Value(token Token) Value {
 	return Value{b.a1, Token1}
 }
 
+func (b *Balance) String() string {
+	return fmt.Sprintf("(%v,%v)", b.a0, b.a1)
+}
+
 func (b *Balance) Clone() *Balance {
 	return &Balance{b.a0, b.a1}
 }
@@ -89,6 +93,12 @@ func (b *Balance) Sub(balance *Balance) *Balance {
 	return b
 }
 
+func (b *Balance) Neg() *Balance {
+	b.a0 = -b.a0
+	b.a1 = -b.a1
+	return b
+}
+
 // RangeCheck checks whether the value is in it's valid range.
 // Returns 0 for a valid range, negative for lower than minimum,
 // and positive value for higher than maximum.
@@ -105,6 +115,33 @@ func (b *Balance) RangeCheck() int {
 		check += 2
 	}
 	return check
+}
+
+// SafeAdd perform Add with overflows check.
+func (b *Balance) SafeAdd(balance *Balance) error {
+	if balance.a0 != 0 {
+		result := b.a0 + balance.a0
+		if (balance.a0 > 0 && result < b.a0) ||
+			(balance.a0 < 0 && result > b.a0) {
+			return fmt.Errorf("balances addition overflows		token: %v, a: %v, b: %v",
+				Token0, b.a0, balance.a0)
+		}
+	}
+	if balance.a1 != 0 {
+		result := b.a1 + balance.a1
+		if (balance.a1 > 0 && result < b.a1) ||
+			(balance.a1 < 0 && result > b.a1) {
+			return fmt.Errorf("balances addition overflows		token: %v, a: %v, b: %v",
+				Token1, b.a1, balance.a1)
+		}
+	}
+	b.Add(balance)
+	return nil
+}
+
+// Cover returns c >= b
+func (b *Balance) Cover(c *Balance) bool {
+	return b.a0 >= c.a0 && b.a1 >= c.a1
 }
 
 func (b Balance) Big() *BigBalance {

@@ -103,6 +103,11 @@ func (entry *UtxoEntry) Amount() types.Amount {
 	return entry.amount
 }
 
+// Value return the value of the output.
+func (entry *UtxoEntry) Value() types.Value {
+	return types.Value{entry.amount, entry.Token()}
+}
+
 // PkScript returns the public key script for the output.
 func (entry *UtxoEntry) PkScript() []byte {
 	return entry.pkScript

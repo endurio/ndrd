@@ -195,13 +195,14 @@ func isBIP0030Node(node *blockNode) bool {
 //
 // At the target block generation rate for the main network, this is
 // approximately every 4 years.
-func CalcBlockSubsidy(height int32, chainParams *chaincfg.Params) int64 {
+func CalcBlockSubsidy(height int32, chainParams *chaincfg.Params) *types.Balance {
 	if chainParams.SubsidyReductionInterval == 0 {
-		return baseSubsidy
+		return types.NewBalance(baseSubsidy, 0)
 	}
 
 	// Equivalent to: baseSubsidy / 2^(height/subsidyHalvingInterval)
-	return baseSubsidy >> uint(height/chainParams.SubsidyReductionInterval)
+	a0 := uint64(baseSubsidy) >> uint(height/chainParams.SubsidyReductionInterval)
+	return types.NewBalance(types.Amount(a0), 0)
 }
 
 // CheckTransactionSanity performs some preliminary checks on a transaction to
@@ -882,20 +883,20 @@ func (b *BlockChain) checkBIP0030(node *blockNode, block *chainutil.Block, view 
 // or the payout amount for the the order.
 // NOTE: CoinBaseTx also has balances returned.
 func CheckTransactionInputs(tx *chainutil.Tx, txHeight int32, utxoView *UtxoViewpoint,
-	chainParams *chaincfg.Params) (map[wire.TokenIdentity]int64, error) {
+	chainParams *chaincfg.Params) (*types.Balance, error) {
 
-	var balances = map[wire.TokenIdentity]int64{wire.STB: 0, wire.NDR: 0}
+	// Coinbase transactions have no inputs.
+	if IsCoinBase(tx) {
+		return nil, nil
+	}
+
+	var balance types.Balance
 
 	// Add each output amount for this transaction.  It is safe
 	// to ignore overflow and out of range errors here because those error
 	// conditions would have already been caught by checkTransactionSanity.
 	for _, txOut := range tx.MsgTx().TxOut {
-		balances[txOut.TokenID()] += txOut.Value
-	}
-
-	// Coinbase transactions have no inputs.
-	if IsCoinBase(tx) {
-		return nil, nil
+		balance.AddValue(txOut.Value)
 	}
 
 	for txInIndex, txIn := range tx.MsgTx().TxIn {
@@ -908,8 +909,6 @@ func CheckTransactionInputs(tx *chainutil.Tx, txHeight int32, utxoView *UtxoView
 				tx.Hash(), txInIndex)
 			return nil, ruleError(ErrMissingTxOut, str)
 		}
-
-		token := utxo.TokenID()
 
 		// Ensure the transaction is not spending coins which have not
 		// yet reached the required coinbase maturity.
@@ -937,34 +936,36 @@ func CheckTransactionInputs(tx *chainutil.Tx, txHeight int32, utxoView *UtxoView
 		originTxSatoshi := utxo.Amount()
 		if originTxSatoshi < 0 {
 			str := fmt.Sprintf("transaction output has negative "+
-				"value of %v", types.Amount(originTxSatoshi))
+				"value of %v", originTxSatoshi)
 			return nil, ruleError(ErrBadTxOutValue, str)
 		}
 		if originTxSatoshi > types.MaxAtom {
 			str := fmt.Sprintf("transaction output value of %v is "+
 				"higher than max allowed value of %v",
-				types.Amount(originTxSatoshi),
+				originTxSatoshi,
 				types.MaxAtom)
 			return nil, ruleError(ErrBadTxOutValue, str)
 		}
 
+		token := utxo.Token()
+
 		// The total of all outputs must not be more than the max
 		// allowed per transaction.  Also, we could potentially overflow
 		// the accumulator so check for overflow.
-		lastSatoshiIn := balances[token]
-		balances[token] -= originTxSatoshi
-		if balances[token] > lastSatoshiIn ||
-			abs(balances[token]) > types.MaxAtom {
+		atomInBefore := balance.Amount(token)
+		balance.SubValue(utxo.Value())
+		if balance.Amount(token) > atomInBefore ||
+			abs(balance.Amount(token)) > types.MaxAtom {
 			str := fmt.Sprintf("total value of all transaction "+
 				"inputs for %v is %v which is higher than max "+
-				"allowed value of %v", token, abs(balances[token]),
+				"allowed value of %v", token, abs(balance.Amount(token)),
 				types.MaxAtom)
 			return nil, ruleError(ErrBadTxOutValue, str)
 		}
 	}
 
 	// caller must check for value validity depend whether it's a tx or an odr
-	return balances, nil
+	return &balance, nil
 }
 
 // checkConnectBlock performs several checks to confirm connecting the passed
@@ -1095,7 +1096,7 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *chainutil.Block,
 	// still relatively cheap as compared to running the scripts) checks
 	// against all the inputs when the signature operations are out of
 	// bounds.
-	var totalTxBalances = map[wire.TokenIdentity]int64{wire.STB: 0, wire.NDR: 0}
+	var totalTxBalances types.Balance // blockBalance
 	for _, tx := range transactions {
 		balances, err := CheckTransactionInputs(tx, node.height, view,
 			b.chainParams)
@@ -1103,11 +1104,11 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *chainutil.Block,
 			return err
 		}
 
-		balanceSTB := balances[wire.STB]
+		balanceSTB := balances.Amount(types.Token1)
 
 		if IsCoinBase(tx) {
 			// coinbase tx doesnot count to totalTxBalances (fee)
-		} else if balanceSTB > 0 || balances[wire.NDR] > 0 {
+		} else if balanceSTB > 0 || balances.Amount(types.Token0) > 0 {
 			// filled order count to accAbsorption instead
 			absnSign := absorption.Sign()
 			if absorption == nil || absnSign == 0 {
@@ -1122,13 +1123,13 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *chainutil.Block,
 					Description: "Wrong order direction to mine.",
 				}
 			}
-			if (balanceSTB > 0) == (balances[wire.NDR] > 0) {
+			if (balanceSTB > 0) == (balances.Amount(types.Token0) > 0) {
 				return RuleError{
 					ErrorCode:   ErrBadAbsorption,
 					Description: "Invalid order: one token must be exchanged for the other.",
 				}
 			}
-			accAbsorption.Add(accAbsorption, big.NewInt(balanceSTB))
+			accAbsorption.Add(accAbsorption, balanceSTB.BigInt())
 			if accAbsorption.Cmp(absorption) == absnSign {
 				return RuleError{
 					ErrorCode:   ErrBadAbsorption,
@@ -1136,18 +1137,8 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *chainutil.Block,
 				}
 			}
 		} else {
-			for token, lastTotalTxBalance := range totalTxBalances {
-				// Sum the total balance and ensure we don't overflow the
-				// accumulator.
-				balance := balances[token]
-				totalTxBalance := lastTotalTxBalance + balance
-				if (balance > 0 && totalTxBalance < lastTotalTxBalance) ||
-					(balance < 0 && totalTxBalance > lastTotalTxBalance) {
-					str := fmt.Sprintf("total balance of %v for block "+
-						"overflows accumulator", token)
-					return ruleError(ErrBadFees, str)
-				}
-				totalTxBalances[token] = totalTxBalance
+			if err := totalTxBalances.SafeAdd(balances); err != nil {
+				return err
 			}
 		}
 
@@ -1166,22 +1157,17 @@ func (b *BlockChain) checkConnectBlock(node *blockNode, block *chainutil.Block,
 	// mining the block.  It is safe to ignore overflow and out of range
 	// errors here because those error conditions would have already been
 	// caught by checkTransactionSanity.
-	var totalSatoshiOut = map[wire.TokenIdentity]int64{wire.STB: 0, wire.NDR: 0}
+	var totalSatoshiOut types.Balance
 	for _, txOut := range transactions[0].MsgTx().TxOut {
-		totalSatoshiOut[txOut.TokenID()] += txOut.Value
+		totalSatoshiOut.AddValue(txOut.Value)
 	}
-	for token, totalTxBalance := range totalTxBalances {
-		expectedSatoshiOut := -totalTxBalance
-		if token == wire.NDR {
-			// block reward is only paid in NDR
-			expectedSatoshiOut += CalcBlockSubsidy(node.height, b.chainParams)
-		}
-		if totalSatoshiOut[token] > expectedSatoshiOut {
-			str := fmt.Sprintf("coinbase transaction of %v for block pays %v "+
-				"which is more than expected value of %v",
-				token, totalSatoshiOut[token], expectedSatoshiOut)
-			return ruleError(ErrBadCoinbaseValue, str)
-		}
+
+	expectedCoinbaseBalance := totalTxBalances.Clone().Neg()
+	expectedCoinbaseBalance.Add(CalcBlockSubsidy(node.height, b.chainParams))
+	if !expectedCoinbaseBalance.Cover(&totalSatoshiOut) {
+		str := fmt.Sprintf("coinbase transaction block pays %v which is more than expected value of %v",
+			totalSatoshiOut, expectedCoinbaseBalance)
+		return ruleError(ErrBadCoinbaseValue, str)
 	}
 
 	// Don't run scripts if this node is before the latest known good
@@ -1322,7 +1308,7 @@ func (b *BlockChain) CheckConnectBlockTemplate(block *chainutil.Block, chainPara
 	return err
 }
 
-func abs(a int64) int64 {
+func abs(a types.Amount) types.Amount {
 	if a < 0 {
 		return -a
 	}
