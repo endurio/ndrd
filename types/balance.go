@@ -81,15 +81,15 @@ func (b *Balance) SubValue(v Value) *Balance {
 	return b
 }
 
-func (b *Balance) Add(balance *Balance) *Balance {
-	b.a0 += balance.a0
-	b.a1 += balance.a1
+func (b *Balance) Add(c *Balance) *Balance {
+	b.a0 += c.a0
+	b.a1 += c.a1
 	return b
 }
 
-func (b *Balance) Sub(balance *Balance) *Balance {
-	b.a0 -= balance.a0
-	b.a1 -= balance.a1
+func (b *Balance) Sub(c *Balance) *Balance {
+	b.a0 -= c.a0
+	b.a1 -= c.a1
 	return b
 }
 
@@ -118,24 +118,24 @@ func (b *Balance) RangeCheck() int {
 }
 
 // SafeAdd perform Add with overflows check.
-func (b *Balance) SafeAdd(balance *Balance) error {
-	if balance.a0 != 0 {
-		result := b.a0 + balance.a0
-		if (balance.a0 > 0 && result < b.a0) ||
-			(balance.a0 < 0 && result > b.a0) {
+func (b *Balance) SafeAdd(c *Balance) error {
+	if c.a0 != 0 {
+		result := b.a0 + c.a0
+		if (c.a0 > 0 && result < b.a0) ||
+			(c.a0 < 0 && result > b.a0) {
 			return fmt.Errorf("balances addition overflows		token: %v, a: %v, b: %v",
-				Token0, b.a0, balance.a0)
+				Token0, b.a0, c.a0)
 		}
 	}
-	if balance.a1 != 0 {
-		result := b.a1 + balance.a1
-		if (balance.a1 > 0 && result < b.a1) ||
-			(balance.a1 < 0 && result > b.a1) {
+	if c.a1 != 0 {
+		result := b.a1 + c.a1
+		if (c.a1 > 0 && result < b.a1) ||
+			(c.a1 < 0 && result > b.a1) {
 			return fmt.Errorf("balances addition overflows		token: %v, a: %v, b: %v",
-				Token1, b.a1, balance.a1)
+				Token1, b.a1, c.a1)
 		}
 	}
-	b.Add(balance)
+	b.Add(c)
 	return nil
 }
 
@@ -145,10 +145,10 @@ func (b *Balance) Cover(c *Balance) bool {
 }
 
 func (b Balance) Big() *BigBalance {
-	var bv BigBalance
-	bv.a0.SetUint64(uint64(b.a0))
-	bv.a1.SetUint64(uint64(b.a1))
-	return &bv
+	var bb BigBalance
+	bb.a0.SetUint64(uint64(b.a0))
+	bb.a1.SetUint64(uint64(b.a1))
+	return &bb
 }
 
 type BigBalance struct {
@@ -160,20 +160,20 @@ var (
 )
 
 func (b *BigBalance) Clone() *BigBalance {
-	var bv BigBalance
-	bv.a0.Set(&b.a0)
-	bv.a1.Set(&b.a1)
-	return &bv
+	var bb BigBalance
+	bb.a0.Set(&b.a0)
+	bb.a1.Set(&b.a1)
+	return &bb
 }
 
-func (b *BigBalance) Add(Balance *BigBalance) *BigBalance {
-	b.a0.Add(&b.a0, &Balance.a0)
-	b.a1.Add(&b.a1, &Balance.a1)
+func (b *BigBalance) Add(bb *BigBalance) *BigBalance {
+	b.a0.Add(&b.a0, &bb.a0)
+	b.a1.Add(&b.a1, &bb.a1)
 	return b
 }
 
-func (b *BigBalance) Sub(Balance *BigBalance) *BigBalance {
-	b.a0.Sub(&b.a0, &Balance.a0)
-	b.a1.Sub(&b.a1, &Balance.a1)
+func (b *BigBalance) Sub(bb *BigBalance) *BigBalance {
+	b.a0.Sub(&b.a0, &bb.a0)
+	b.a1.Sub(&b.a1, &bb.a1)
 	return b
 }
