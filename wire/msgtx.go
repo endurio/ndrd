@@ -305,6 +305,22 @@ func (msg *MsgTx) AddTxOut(to *TxOut) {
 	msg.TxOut = append(msg.TxOut, to)
 }
 
+func (msg *MsgTx) AddBalance(b *types.Balance, pkScript []byte) {
+	// add existing token amount
+	for _, out := range msg.TxOut {
+		a := b.Amount(out.Value.Token)
+		if a > 0 {
+			out.Value.Amount += a
+			b.SetAmount(out.Value.Token, 0)
+		}
+	}
+
+	// add the rest of the values to new txout
+	for _, v := range b.Values() {
+		msg.AddTxOut(NewTxOut(v, pkScript))
+	}
+}
+
 // TxHash generates the Hash for the transaction.
 func (msg *MsgTx) TxHash() chainhash.Hash {
 	// Encode the transaction and calculate double sha256 on the result.

@@ -45,7 +45,7 @@ type Policy struct {
 	// TxMinFreeFee is the minimum fee in Atom/1000 bytes that is
 	// required for a transaction to be treated as free for mining purposes
 	// (block template generation).
-	TxMinFreeFee types.Amount
+	TxMinFreeFee types.PriceRate
 }
 
 // minInt is a helper function to return the minimum of two ints.  This avoids
@@ -84,7 +84,7 @@ func calcInputValueAge(tx *wire.MsgTx, utxoView *blockchain.UtxoViewpoint, nextB
 
 			// Sum the input value times age.
 			inputValue := entry.Amount()
-			totalInputAge += float64(inputValue * int64(inputAge))
+			totalInputAge += float64(inputValue) * float64(inputAge)
 		}
 	}
 

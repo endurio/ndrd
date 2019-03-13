@@ -17,6 +17,7 @@ type Balance struct {
 
 var (
 	BalanceEmpty = Balance{}
+	BalanceDummy = Balance{-1, -1}
 )
 
 func NewBalance(a0, a1 Amount) *Balance {
@@ -47,6 +48,21 @@ func (b *Balance) Value(token Token) Value {
 		return Value{b.a0, Token0}
 	}
 	return Value{b.a1, Token1}
+}
+
+func (b *Balance) Values() []Value {
+	values := make([]Value, 2)
+	if b.a0 != 0 {
+		values = append(values, Value{b.a0, Token0})
+	}
+	if b.a1 != 0 {
+		values = append(values, Value{b.a1, Token1})
+	}
+	return values
+}
+
+func (b *Balance) Fee() *Fee {
+	return (*Fee)(b)
 }
 
 func (b *Balance) String() string {

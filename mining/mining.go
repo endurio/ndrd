@@ -54,10 +54,10 @@ type TxDesc struct {
 	Height int32
 
 	// Fee is the total fee the transaction associated with the entry pays.
-	Fee int64
+	Fee types.Fee
 
 	// FeePerKB is the fee the transaction pays in Atom per 1000 bytes.
-	FeePerKB int64
+	FeePerKB types.Price
 }
 
 // TxSource represents a source of transactions to consider for inclusion in
@@ -128,9 +128,9 @@ type OdrSource interface {
 // which have not been mined into a block yet.
 type txPrioItem struct {
 	tx       *chainutil.Tx
-	fee      int64
+	fee      types.Fee
 	priority float64
-	feePerKB int64
+	feePerKB types.Price
 
 	// dependsOn holds a map of transaction hashes which this one depends
 	// on.  It will only be set when the transaction references other
@@ -147,6 +147,7 @@ type txPriorityQueueLessFunc func(*txPriorityQueue, int, int) bool
 // supports an arbitrary compare function as defined by txPriorityQueueLessFunc.
 type txPriorityQueue struct {
 	lessFunc txPriorityQueueLessFunc
+	rate     types.PriceRate
 	items    []*txPrioItem
 }
 
@@ -199,7 +200,7 @@ func txPQByPriority(pq *txPriorityQueue, i, j int) bool {
 	// Using > here so that pop gives the highest priority item as opposed
 	// to the lowest.  Sort by priority first, then fee.
 	if pq.items[i].priority == pq.items[j].priority {
-		return pq.items[i].feePerKB > pq.items[j].feePerKB
+		return pq.items[i].feePerKB.Rate(pq.rate) > pq.items[j].feePerKB.Rate(pq.rate)
 	}
 	return pq.items[i].priority > pq.items[j].priority
 
@@ -213,7 +214,7 @@ func txPQByFee(pq *txPriorityQueue, i, j int) bool {
 	if pq.items[i].feePerKB == pq.items[j].feePerKB {
 		return pq.items[i].priority > pq.items[j].priority
 	}
-	return pq.items[i].feePerKB > pq.items[j].feePerKB
+	return pq.items[i].feePerKB.Rate(pq.rate) > pq.items[j].feePerKB.Rate(pq.rate)
 }
 
 // newTxPriorityQueue returns a new transaction priority queue that reserves the
@@ -247,7 +248,7 @@ type BlockTemplate struct {
 	// template pays in base units.  Since the first transaction is the
 	// coinbase, the first entry (offset 0) will contain the negative of the
 	// sum of the fees of all other transactions.
-	Fees []int64
+	Fees []types.Fee
 
 	// SigOpCosts contains the number of signature operations each
 	// transaction in the generated template performs.
@@ -341,9 +342,11 @@ func createCoinbaseTx(params *chaincfg.Params, coinbaseScript []byte, nextBlockH
 		SignatureScript: coinbaseScript,
 		Sequence:        wire.MaxTxInSequenceNum,
 	})
-	// Block reward is paid using NDR
-	tx.AddTxOut(wire.NewTxOutToken(blockchain.CalcBlockSubsidy(nextBlockHeight, params),
-		pkScript, wire.NDR))
+	// Block rewards
+	for _, value := range blockchain.CalcBlockSubsidy(nextBlockHeight, params).Values() {
+		tx.AddTxOut(wire.NewTxOut(value, pkScript))
+	}
+
 	return chainutil.NewTx(tx), nil
 }
 
@@ -576,9 +579,9 @@ func (g *BlkTmplGenerator) NewBlockTemplate(payToAddress chainutil.Address) (*Bl
 	// a transaction as it is selected for inclusion in the final block.
 	// However, since the total fees aren't known yet, use a dummy value for
 	// the coinbase fee which will be updated later.
-	txFees := make([]int64, 0, len(sourceTxns))
+	txFees := make([]types.Fee, 0, len(sourceTxns))
 	txSigOpCosts := make([]int64, 0, len(sourceTxns))
-	txFees = append(txFees, -1) // Updated once known
+	txFees = append(txFees, types.FeeDummy) // Updated once known
 	txSigOpCosts = append(txSigOpCosts, coinbaseSigOpCost)
 
 	if sourceOdrs != nil {
@@ -691,7 +694,7 @@ mempoolLoop:
 	blockWeight := uint32((int64(blockHeaderOverhead) * blockchain.WitnessScaleFactor) +
 		blockchain.GetTransactionWeight(coinbaseTx))
 	blockSigOpCost := coinbaseSigOpCost
-	totalFees := int64(0)
+	var totalFees types.Fee
 	accAbsorption := new(big.Int)
 
 	// Query the version bits state to see if segwit has been activated, if
@@ -788,12 +791,12 @@ mempoolLoop:
 		// Skip free transactions once the block is larger than the
 		// minimum block size.
 		if sortedByFee &&
-			prioItem.feePerKB < int64(g.policy.TxMinFreeFee) &&
+			prioItem.feePerKB.Rate(g.policy.TxMinFreeFee) < 0 &&
 			blockPlusTxWeight >= g.policy.BlockMinWeight {
 
-			log.Tracef("Skipping tx %s with feePerKB %d "+
-				"< TxMinFreeFee %d and block weight %d >= "+
-				"minBlockWeight %d", tx.Hash(), prioItem.feePerKB,
+			log.Tracef("Skipping tx %s with feePerKB %v "+
+				"< TxMinFreeFee %v and block weight %v >= "+
+				"minBlockWeight %v", tx.Hash(), prioItem.feePerKB,
 				g.policy.TxMinFreeFee, blockPlusTxWeight,
 				g.policy.BlockMinWeight)
 			logSkippedDeps(tx, deps)
@@ -840,8 +843,8 @@ mempoolLoop:
 			continue
 		}
 
-		balanceSTB := balances[wire.STB]
-		if balanceSTB > 0 || balances[wire.NDR] > 0 {
+		balanceSTB := balances.Amount(types.Token1)
+		if balanceSTB > 0 || balances.Amount(types.Token0) > 0 {
 			absnSign := absorption.Sign()
 			if absorption == nil || absnSign == 0 {
 				return nil, blockchain.RuleError{
@@ -855,13 +858,13 @@ mempoolLoop:
 					Description: "Wrong order direction to mine.",
 				}
 			}
-			if (balanceSTB > 0) == (balances[wire.NDR] > 0) {
+			if (balanceSTB > 0) == (balances.Amount(types.Token0) > 0) {
 				return nil, blockchain.RuleError{
 					ErrorCode:   blockchain.ErrBadAbsorption,
 					Description: "Invalid order: one token must be exchanged for the other.",
 				}
 			}
-			accAbsorption.Add(accAbsorption, big.NewInt(balanceSTB))
+			accAbsorption.Add(accAbsorption, balanceSTB.BigInt())
 			if accAbsorption.Cmp(absorption) == absnSign {
 				return nil, blockchain.RuleError{
 					ErrorCode:   blockchain.ErrBadAbsorption,
@@ -892,7 +895,7 @@ mempoolLoop:
 		blockTxns = append(blockTxns, tx)
 		blockWeight += txWeight
 		blockSigOpCost += int64(sigOpCost)
-		totalFees += prioItem.fee
+		totalFees.Add(&prioItem.fee)
 		txFees = append(txFees, prioItem.fee)
 		txSigOpCosts = append(txSigOpCosts, int64(sigOpCost))
 
@@ -918,8 +921,8 @@ mempoolLoop:
 	blockWeight -= wire.MaxVarIntPayload -
 		(uint32(wire.VarIntSerializeSize(uint64(len(blockTxns)))) *
 			blockchain.WitnessScaleFactor)
-	coinbaseTx.MsgTx().TxOut[0].Value += totalFees
-	txFees[0] = -totalFees
+	coinbaseTx.MsgTx().AddBalance(totalFees.Balance(), coinbaseTx.MsgTx().TxOut[0].PkScript)
+	txFees[0] = *totalFees.Balance().Clone().Neg().Fee()
 
 	// If segwit is active and we included transactions with witness data,
 	// then we'll need to include a commitment to the witness data in an
@@ -955,7 +958,7 @@ mempoolLoop:
 		// Finally, create the OP_RETURN carrying witness commitment
 		// output as an additional output within the coinbase.
 		commitmentOutput := &wire.TxOut{
-			Value:    0,
+			Value:    types.ValueEmpty,
 			PkScript: witnessScript,
 		}
 		coinbaseTx.MsgTx().TxOut = append(coinbaseTx.MsgTx().TxOut,
@@ -1090,8 +1093,8 @@ membookLoop:
 		prioItem.priority = math.MaxFloat64
 
 		// Calculate the fee in Atom/kB.
-		prioItem.feePerKB = 0
-		prioItem.fee = 0
+		prioItem.feePerKB = types.Price{}
+		prioItem.fee = types.Fee{}
 
 		// Add the order to the priority queue to mark it ready
 		// for inclusion in the block unless it has dependencies.

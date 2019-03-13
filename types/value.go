@@ -10,7 +10,8 @@ type Value struct {
 }
 
 var (
-	ValueInvalid = Value{-1, TokenInvalid}
+	ValueEmpty = Value{}
+	ValueDummy = Value{-1, TokenInvalid}
 )
 
 // RangeCheck checks whether the value is in it's valid range.
