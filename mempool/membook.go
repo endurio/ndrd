@@ -410,7 +410,7 @@ func (ob *OdrBook) maybeAcceptOrder(order *chainutil.Odr) (*OdrDesc, error) {
 		return nil, err
 	}
 
-	if balances[wire.STB] <= 0 && balances[wire.NDR] <= 0 {
+	if balances.Amount(types.Token1) <= 0 && balances.Amount(types.Token0) <= 0 {
 		str := fmt.Sprintf("Not an order: %v", txHash)
 		return nil, blockchain.RuleError{
 			ErrorCode:   blockchain.ErrNotAnOrder,
@@ -472,7 +472,7 @@ func (ob *OdrBook) maybeAcceptOrder(order *chainutil.Odr) (*OdrDesc, error) {
 	}
 
 	// Add to transaction pool.
-	oD := ob.addOrder(order, balances[wire.STB], balances[wire.NDR], bestHeight)
+	oD := ob.addOrder(order, balances.Amount(types.Token1), balances.Amount(types.Token0), bestHeight)
 
 	log.Debugf("Accepted order %v (book size: %v)", txHash, len(ob.book))
 
