@@ -147,7 +147,7 @@ type txPriorityQueueLessFunc func(*txPriorityQueue, int, int) bool
 // supports an arbitrary compare function as defined by txPriorityQueueLessFunc.
 type txPriorityQueue struct {
 	lessFunc txPriorityQueueLessFunc
-	rate     types.PriceRate
+	minPrice types.MinTokenPrice
 	items    []*txPrioItem
 }
 
@@ -200,7 +200,7 @@ func txPQByPriority(pq *txPriorityQueue, i, j int) bool {
 	// Using > here so that pop gives the highest priority item as opposed
 	// to the lowest.  Sort by priority first, then fee.
 	if pq.items[i].priority == pq.items[j].priority {
-		return pq.items[i].feePerKB.Rate(pq.rate) > pq.items[j].feePerKB.Rate(pq.rate)
+		return pq.items[i].feePerKB.Rate(pq.minPrice) > pq.items[j].feePerKB.Rate(pq.minPrice)
 	}
 	return pq.items[i].priority > pq.items[j].priority
 
@@ -214,7 +214,7 @@ func txPQByFee(pq *txPriorityQueue, i, j int) bool {
 	if pq.items[i].feePerKB == pq.items[j].feePerKB {
 		return pq.items[i].priority > pq.items[j].priority
 	}
-	return pq.items[i].feePerKB.Rate(pq.rate) > pq.items[j].feePerKB.Rate(pq.rate)
+	return pq.items[i].feePerKB.Rate(pq.minPrice) > pq.items[j].feePerKB.Rate(pq.minPrice)
 }
 
 // newTxPriorityQueue returns a new transaction priority queue that reserves the
