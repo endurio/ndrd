@@ -9,8 +9,8 @@ import (
 	"math/big"
 )
 
-// Balance contains all Balances carried by an tx output.
-// Acts like a map of token => amount, but practically almost always a single to 2 tokens array.
+// Balance contains all token amounts carried by an tx output.
+// Designed as map of Token => Amount, but currently be a struct of 2 fields for optimization.
 type Balance struct {
 	a0, a1 Amount
 }
