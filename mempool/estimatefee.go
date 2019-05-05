@@ -210,11 +210,13 @@ func (ef *FeeEstimator) ObserveTransaction(t *TxDesc) {
 
 	hash := *t.Tx.Hash()
 	if _, ok := ef.observed[hash]; !ok {
+		// TODO: estimate fee for all accepted tokens
+		fee := types.Amount(t.Fee.Balance().Amount(types.Token0))
 		size := uint32(GetTxVirtualSize(t.Tx))
 
 		ef.observed[hash] = &observedTransaction{
 			hash:     hash,
-			feeRate:  NewSatoshiPerByte(types.Amount(t.Fee), size),
+			feeRate:  NewSatoshiPerByte(fee, size),
 			observed: t.Height,
 			mined:    mining.UnminedHeight,
 		}
