@@ -266,12 +266,13 @@ type GetPeerInfoResult struct {
 type GetRawMempoolVerboseResult struct {
 	Size             int32    `json:"size"`
 	Vsize            int32    `json:"vsize"`
-	Fee              float64  `json:"fee"`
 	Time             int64    `json:"time"`
 	Height           int64    `json:"height"`
 	StartingPriority float64  `json:"startingpriority"`
 	CurrentPriority  float64  `json:"currentpriority"`
 	Depends          []string `json:"depends"`
+
+	Fee []float64 `json:"fee"`
 }
 
 // GetRawMembookVerboseResult models the data returned from the getrawmembook
