@@ -257,13 +257,13 @@ func TestAmountMulF64(t *testing.T) {
 		},
 		{
 			name: "Round down",
-			amt:  49, // 49 Satoshis
+			amt:  49, // 49 Atoms
 			mul:  0.01,
 			res:  0,
 		},
 		{
 			name: "Round up",
-			amt:  50, // 50 Satoshis
+			amt:  50, // 50 Atoms
 			mul:  0.01,
 			res:  1, // 1 Atom
 		},
@@ -281,21 +281,21 @@ func TestAmountMulF64(t *testing.T) {
 		},
 		{
 			name: "Multiply 100 by 66%.",
-			amt:  100, // 100 Satoshis
+			amt:  100, // 100 Atoms
 			mul:  0.66,
-			res:  66, // 66 Satoshis
+			res:  66, // 66 Atoms
 		},
 		{
 			name: "Multiply 100 by 66.6%.",
-			amt:  100, // 100 Satoshis
+			amt:  100, // 100 Atoms
 			mul:  0.666,
-			res:  67, // 67 Satoshis
+			res:  67, // 67 Atoms
 		},
 		{
 			name: "Multiply 100 by 2/3.",
-			amt:  100, // 100 Satoshis
+			amt:  100, // 100 Atoms
 			mul:  2.0 / 3,
-			res:  67, // 67 Satoshis
+			res:  67, // 67 Atoms
 		},
 	}
 
