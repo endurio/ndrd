@@ -44,41 +44,44 @@ const (
 	// (1 + 15*74 + 3) + (15*34 + 3) + 23 = 1650
 	maxStandardSigScriptSize = 1650
 
-	// DefaultMinRelayTxFee is the minimum fee in satoshi that is required
-	// for a transaction to be treated as free for relay and mining
-	// purposes.  It is also used to help determine if a transaction is
-	// considered dust and as a base for calculating minimum required fees
-	// for larger transactions.  This value is in Atom/1000 bytes.
-	DefaultMinRelayTxFee = types.Amount(0)
-
 	// maxStandardMultiSigKeys is the maximum number of public keys allowed
 	// in a multi-signature transaction output script for it to be
 	// considered standard.
 	maxStandardMultiSigKeys = 3
 )
 
+var (
+
+	// DefaultMinRelayTxPrice is the minimum fee in atom that is required
+	// for a transaction to be treated as free for relay and mining
+	// purposes.  It is also used to help determine if a transaction is
+	// considered dust and as a base for calculating minimum required fees
+	// for larger transactions.  This value is in Atom/1000 bytes.
+	DefaultMinRelayTxPrice = types.PriceReq{}
+)
+
 // calcMinRequiredTxRelayFee returns the minimum transaction fee required for a
 // transaction with the passed serialized size to be accepted into the memory
 // pool and relayed.
-func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxFee types.Amount) int64 {
+func calcMinRequiredTxRelayFee(serializedSize int64, minRelayTxPrice types.PriceReq) types.Fee {
 	// Calculate the minimum fee for a transaction to be allowed into the
 	// mempool and relayed by scaling the base fee (which is the minimum
 	// free transaction relay fee).  minTxRelayFee is in Atom/kB so
 	// multiply by serializedSize (which is in bytes) and divide by 1000 to
-	// get minimum Satoshis.
-	minFee := (serializedSize * int64(minRelayTxFee)) / 1000
+	// get minimum Atoms.
+	minFee := minRelayTxPrice.Balance().Mul(types.Amount(serializedSize)).Div(1000)
 
-	if minFee == 0 && minRelayTxFee > 0 {
-		minFee = int64(minRelayTxFee)
+	if minFee.Empty() && !minRelayTxPrice.Balance().Empty() {
+		minFee = minRelayTxPrice.Balance()
 	}
 
 	// Set the minimum fee to the maximum possible value if the calculated
 	// fee is not in the valid range for monetary amounts.
-	if minFee < 0 || minFee > types.MaxAtom {
-		minFee = types.MaxAtom
+	if minFee.RangeCheck() != 0 {
+		minFee = (&types.BalanceMax).Clone()
 	}
 
-	return minFee
+	return *minFee.Fee()
 }
 
 // checkInputsStandard performs a series of checks on a transaction's inputs
@@ -179,10 +182,17 @@ func checkPkScriptStandard(pkScript []byte, scriptClass txscript.ScriptClass) er
 // Dust is defined in terms of the minimum transaction relay fee.  In
 // particular, if the cost to the network to spend coins is more than 1/3 of the
 // minimum transaction relay fee, it is considered dust.
-func isDust(txOut *wire.TxOut, minRelayTxFee types.Amount) bool {
+func isDust(txOut *wire.TxOut, minRelayTxPrice types.PriceReq) bool {
 	// Unspendable outputs are considered dust.
 	if txscript.IsUnspendable(txOut.PkScript) {
 		return true
+	}
+
+	token := txOut.Value.Token
+	minPrice := minRelayTxPrice.Balance().Amount(token)
+	if minPrice == 0 {
+		// No min price configured for output token
+		return false
 	}
 
 	// The total serialized size consists of the output and the associated
@@ -267,7 +277,7 @@ func isDust(txOut *wire.TxOut, minRelayTxFee types.Amount) bool {
 	//
 	// The following is equivalent to (value/totalSize) * (1/3) * 1000
 	// without needing to do floating point math.
-	return txOut.Value*1000/(3*int64(totalSize)) < int64(minRelayTxFee)
+	return txOut.Value.Amount.Int64()*1000/(3*int64(totalSize)) < int64(minPrice)
 }
 
 // checkTransactionStandard performs a series of checks on a transaction to
@@ -278,7 +288,7 @@ func isDust(txOut *wire.TxOut, minRelayTxFee types.Amount) bool {
 // of recognized forms, and not containing "dust" outputs (those that are
 // so small it costs more to process them than they are worth).
 func checkTransactionStandard(tx *chainutil.Tx, height int32,
-	medianTimePast time.Time, minRelayTxFee types.Amount,
+	medianTimePast time.Time, minRelayTxPrice types.PriceReq,
 	maxTxVersion int32) error {
 
 	// The transaction must be a currently supported version.
@@ -353,7 +363,7 @@ func checkTransactionStandard(tx *chainutil.Tx, height int32,
 		// "dust".
 		if scriptClass == txscript.NullDataTy {
 			numNullDataOutputs++
-		} else if isDust(txOut, minRelayTxFee) {
+		} else if isDust(txOut, minRelayTxPrice) {
 			str := fmt.Sprintf("transaction output %d: payment "+
 				"of %d is dust", i, txOut.Value)
 			return txRuleError(wire.RejectDust, str)

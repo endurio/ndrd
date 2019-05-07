@@ -345,7 +345,7 @@ func (ob *OdrBook) maybeAcceptOrder(order *chainutil.Odr) (*OdrDesc, error) {
 	// forbid their acceptance.
 	if !ob.cfg.Policy.AcceptNonStd {
 		err = checkTransactionStandard(order.Tx, nextBlockHeight,
-			medianTimePast, ob.cfg.Policy.MinRelayTxFee,
+			medianTimePast, ob.cfg.Policy.MinRelayTxPrice,
 			ob.cfg.Policy.MaxTxVersion)
 		if err != nil {
 			// Attempt to extract a reject code from the error so
@@ -472,7 +472,10 @@ func (ob *OdrBook) maybeAcceptOrder(order *chainutil.Odr) (*OdrDesc, error) {
 	}
 
 	// Add to transaction pool.
-	oD := ob.addOrder(order, balances.Amount(types.Token1), balances.Amount(types.Token0), bestHeight)
+	oD := ob.addOrder(order,
+		balances.Amount(types.Token1).Int64(),
+		balances.Amount(types.Token0).Int64(),
+		bestHeight)
 
 	log.Debugf("Accepted order %v (book size: %v)", txHash, len(ob.book))
 

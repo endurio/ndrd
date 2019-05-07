@@ -10,21 +10,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chaincfg"
 	"github.com/endurio/ndrd/chaincfg/chainhash"
-	"github.com/endurio/ndrd/txscript"
-	"github.com/endurio/ndrd/wire"
+	"github.com/endurio/ndrd/chainec"
 	"github.com/endurio/ndrd/chainutil"
+	"github.com/endurio/ndrd/txscript"
+	"github.com/endurio/ndrd/types"
+	"github.com/endurio/ndrd/wire"
 )
 
 // TestCalcMinRequiredTxRelayFee tests the calcMinRequiredTxRelayFee API.
 func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 	tests := []struct {
-		name     string         // test description.
-		size     int64          // Transaction size in bytes.
+		name     string       // test description.
+		size     int64        // Transaction size in bytes.
 		relayFee types.Amount // minimum relay transaction fee.
-		want     int64          // Expected fee.
+		want     int64        // Expected fee.
 	}{
 		{
 			// Ensure combination of size and fee that are less than 1000
@@ -37,13 +38,13 @@ func TestCalcMinRequiredTxRelayFee(t *testing.T) {
 		{
 			"100 bytes with default minimum relay fee",
 			100,
-			DefaultMinRelayTxFee,
+			DefaultMinRelayTxPrice,
 			100,
 		},
 		{
 			"max standard tx size with default minimum relay fee",
 			maxStandardTxWeight / 4,
-			DefaultMinRelayTxFee,
+			DefaultMinRelayTxPrice,
 			100000,
 		},
 		{
@@ -471,7 +472,7 @@ func TestCheckTransactionStandard(t *testing.T) {
 	for _, test := range tests {
 		// Ensure standardness is as expected.
 		err := checkTransactionStandard(chainutil.NewTx(&test.tx),
-			test.height, pastMedianTime, DefaultMinRelayTxFee, 1)
+			test.height, pastMedianTime, DefaultMinRelayTxPrice, 1)
 		if err == nil && test.isStandard {
 			// Test passes since function returned standard for a
 			// transaction which is intended to be standard.

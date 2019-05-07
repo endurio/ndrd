@@ -132,9 +132,9 @@ type Policy struct {
 	// fraction of the max signature operations for a block.
 	MaxSigOpCostPerTx int
 
-	// MinRelayTxFee defines the minimum transaction fee in BTC/kB to be
+	// MinRelayTxPrice defines the minimum transaction fee in Coin/kB to be
 	// considered a non-zero fee.
-	MinRelayTxFee types.Amount
+	MinRelayTxPrice types.PriceReq
 }
 
 // TxDesc is a descriptor containing a transaction in the mempool along with
@@ -520,16 +520,19 @@ func (mp *TxPool) RemoveDoubleSpends(tx *chainutil.Tx) {
 // helper for maybeAcceptTransaction.
 //
 // This function MUST be called with the mempool lock held (for writes).
-func (mp *TxPool) addTransaction(utxoView *blockchain.UtxoViewpoint, tx *chainutil.Tx, height int32, fee int64) *TxDesc {
+func (mp *TxPool) addTransaction(utxoView *blockchain.UtxoViewpoint,
+	tx *chainutil.Tx, height int32, fee types.Fee) *TxDesc {
 	// Add the transaction to the pool and mark the referenced outpoints
 	// as spent by the pool.
 	txD := &TxDesc{
 		TxDesc: mining.TxDesc{
-			Tx:       tx,
-			Added:    time.Now(),
-			Height:   height,
-			Fee:      fee,
-			FeePerKB: fee * 1000 / GetTxVirtualSize(tx),
+			Tx:     tx,
+			Added:  time.Now(),
+			Height: height,
+			Fee:    fee,
+			FeePerKB: *fee.Balance().
+				Mul(types.Amount(1000)).
+				Div(types.Amount(GetTxVirtualSize(tx))).Price(),
 		},
 		StartingPriority: mining.CalcPriority(tx.MsgTx(), utxoView, height),
 	}
@@ -698,7 +701,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *chainutil.Tx, isNew, rateLimit, rej
 	// forbid their acceptance.
 	if !mp.cfg.Policy.AcceptNonStd {
 		err = checkTransactionStandard(tx, nextBlockHeight,
-			medianTimePast, mp.cfg.Policy.MinRelayTxFee,
+			medianTimePast, mp.cfg.Policy.MinRelayTxPrice,
 			mp.cfg.Policy.MaxTxVersion)
 		if err != nil {
 			// Attempt to extract a reject code from the error so
@@ -806,8 +809,9 @@ func (mp *TxPool) maybeAcceptTransaction(tx *chainutil.Tx, isNew, rateLimit, rej
 			"object is an order, not a transaction")
 	}
 
-	// TODO: estimate the total fee using NDR/STB rate
-	txFee := -balances.Amount(types.Token1) - balances.Amount(types.Token0)
+	// tx fee is the remaining balance negated
+	txFee := *balances
+	txFee.Neg()
 
 	// Don't allow transactions with non-standard inputs if the network
 	// parameters forbid their acceptance.
@@ -863,8 +867,8 @@ func (mp *TxPool) maybeAcceptTransaction(tx *chainutil.Tx, isNew, rateLimit, rej
 	// high-priority transactions, don't require a fee for it.
 	serializedSize := GetTxVirtualSize(tx)
 	minFee := calcMinRequiredTxRelayFee(serializedSize,
-		mp.cfg.Policy.MinRelayTxFee)
-	if serializedSize >= (DefaultBlockPrioritySize-1000) && txFee < minFee {
+		mp.cfg.Policy.MinRelayTxPrice)
+	if serializedSize >= (DefaultBlockPrioritySize-1000) && !txFee.Cover(minFee.Balance()) {
 		str := fmt.Sprintf("transaction %v has %d fees which is under "+
 			"the required amount of %d", txHash, txFee,
 			minFee)
@@ -875,7 +879,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *chainutil.Tx, isNew, rateLimit, rej
 	// in the next block.  Transactions which are being added back to the
 	// memory pool from blocks that have been disconnected during a reorg
 	// are exempted.
-	if isNew && !mp.cfg.Policy.DisableRelayPriority && txFee < minFee {
+	if isNew && !mp.cfg.Policy.DisableRelayPriority && !txFee.Cover(minFee.Balance()) {
 		currentPriority := mining.CalcPriority(tx.MsgTx(), utxoView,
 			nextBlockHeight)
 		if currentPriority <= mining.MinHighPriority {
@@ -888,7 +892,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *chainutil.Tx, isNew, rateLimit, rej
 
 	// Free-to-relay transactions are rate limited here to prevent
 	// penny-flooding with tiny transactions as a form of attack.
-	if rateLimit && txFee < minFee {
+	if rateLimit && !txFee.Cover(minFee.Balance()) {
 		nowUnix := time.Now().Unix()
 		// Decay passed data with an exponentially decaying ~10 minute
 		// window - matches bitcoind handling.
@@ -923,7 +927,7 @@ func (mp *TxPool) maybeAcceptTransaction(tx *chainutil.Tx, isNew, rateLimit, rej
 	}
 
 	// Add to transaction pool.
-	txD := mp.addTransaction(utxoView, tx, bestHeight, txFee)
+	txD := mp.addTransaction(utxoView, tx, bestHeight, *txFee.Fee())
 
 	log.Debugf("Accepted transaction %v (pool size: %v)", txHash,
 		len(mp.pool))

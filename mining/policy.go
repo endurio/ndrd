@@ -42,10 +42,10 @@ type Policy struct {
 	// transactions to be used when generating a block template.
 	BlockPrioritySize uint32
 
-	// TxMinFreeFee is the minimum fee in Atom/1000 bytes that is
+	// TxMinFreePrice is the minimum fee in Atom/1000 bytes that is
 	// required for a transaction to be treated as free for mining purposes
 	// (block template generation).
-	TxMinFreeFee types.MinTokenPrice
+	TxMinFreePrice types.PriceReq
 }
 
 // minInt is a helper function to return the minimum of two ints.  This avoids

@@ -18,6 +18,7 @@ type Balance struct {
 var (
 	BalanceEmpty = Balance{}
 	BalanceDummy = Balance{-1, -1}
+	BalanceMax   = Balance{MaxAtom, MaxAtom}
 )
 
 func NewBalance(a0, a1 Amount) *Balance {
@@ -63,6 +64,10 @@ func (b *Balance) Values() []Value {
 
 func (b *Balance) Fee() *Fee {
 	return (*Fee)(b)
+}
+
+func (b *Balance) Price() *Price {
+	return (*Price)(b)
 }
 
 func (b *Balance) String() string {
@@ -115,6 +120,18 @@ func (b *Balance) Neg() *Balance {
 	return b
 }
 
+func (b *Balance) Mul(a Amount) *Balance {
+	b.a0 *= a
+	b.a1 *= a
+	return b
+}
+
+func (b *Balance) Div(a Amount) *Balance {
+	b.a0 /= a
+	b.a1 /= a
+	return b
+}
+
 // RangeCheck checks whether the value is in it's valid range.
 // Returns 0 for a valid range, negative for lower than minimum,
 // and positive value for higher than maximum.
@@ -155,9 +172,13 @@ func (b *Balance) SafeAdd(c *Balance) error {
 	return nil
 }
 
-// Cover returns c >= b
+// Cover returns b >= c
 func (b *Balance) Cover(c *Balance) bool {
 	return b.a0 >= c.a0 && b.a1 >= c.a1
+}
+
+func (b *Balance) Empty() bool {
+	return b.a0 == 0 && b.a1 == 0
 }
 
 func (b Balance) Big() *BigBalance {

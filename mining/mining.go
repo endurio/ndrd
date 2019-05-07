@@ -147,7 +147,7 @@ type txPriorityQueueLessFunc func(*txPriorityQueue, int, int) bool
 // supports an arbitrary compare function as defined by txPriorityQueueLessFunc.
 type txPriorityQueue struct {
 	lessFunc txPriorityQueueLessFunc
-	minPrice types.MinTokenPrice
+	minPrice types.PriceReq
 	items    []*txPrioItem
 }
 
@@ -479,7 +479,7 @@ func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 // the priority queue is updated to prioritize by fees per kilobyte (then
 // priority).
 //
-// When the fees per kilobyte drop below the TxMinFreeFee policy setting, the
+// When the fees per kilobyte drop below the TxMinFreePrice policy setting, the
 // transaction will be skipped unless the BlockMinSize policy setting is
 // nonzero, in which case the block will be filled with the low-fee/free
 // transactions until the block size reaches that minimum size.
@@ -501,7 +501,7 @@ func NewBlkTmplGenerator(policy *Policy, params *chaincfg.Params,
 //  |                                   |   |
 //  |                                   |   |--- policy.BlockMaxSize
 //  |  Transactions prioritized by fee  |   |
-//  |  until <= policy.TxMinFreeFee     |   |
+//  |  until <= policy.TxMinFreePrice   |   |
 //  |                                   |   |
 //  |                                   |   |
 //  |                                   |   |
@@ -791,13 +791,13 @@ mempoolLoop:
 		// Skip free transactions once the block is larger than the
 		// minimum block size.
 		if sortedByFee &&
-			prioItem.feePerKB.Rate(g.policy.TxMinFreeFee) < 0 &&
+			prioItem.feePerKB.Rate(g.policy.TxMinFreePrice) < 0 &&
 			blockPlusTxWeight >= g.policy.BlockMinWeight {
 
 			log.Tracef("Skipping tx %s with feePerKB %v "+
-				"< TxMinFreeFee %v and block weight %v >= "+
+				"< TxMinFreePrice %v and block weight %v >= "+
 				"minBlockWeight %v", tx.Hash(), prioItem.feePerKB,
-				g.policy.TxMinFreeFee, blockPlusTxWeight,
+				g.policy.TxMinFreePrice, blockPlusTxWeight,
 				g.policy.BlockMinWeight)
 			logSkippedDeps(tx, deps)
 			continue
