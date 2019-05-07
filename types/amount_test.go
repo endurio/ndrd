@@ -155,7 +155,7 @@ func TestAmountUnitConversions(t *testing.T) {
 		},
 		{
 
-			name:      "satoshi",
+			name:      "atom",
 			amount:    44433322211100,
 			unit:      AmountAtom,
 			converted: 44433322211100,

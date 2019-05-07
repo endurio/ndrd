@@ -6,12 +6,12 @@
 package types
 
 const (
-	// AtomPerCent is the number of satoshi in one bitcoin cent.
+	// AtomPerCent is the number of atom in one bitcoin cent.
 	AtomPerCent = 1e6
 
-	// AtomPerCoin is the number of satoshi in one bitcoin (1 BTC).
+	// AtomPerCoin is the number of atom in one bitcoin (1 BTC).
 	AtomPerCoin = 1e8
 
-	// MaxAtom is the maximum transaction amount allowed in satoshi.
+	// MaxAtom is the maximum transaction amount allowed in atom.
 	MaxAtom = 21e6 * AtomPerCoin
 )

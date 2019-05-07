@@ -272,7 +272,7 @@ func isDust(txOut *wire.TxOut, minRelayTxPrice types.PriceReq) bool {
 	//
 	// Using the typical values for a pay-to-pubkey-hash transaction from
 	// the breakdown above and the default minimum free transaction relay
-	// fee of 1000, this equates to values less than 546 satoshi being
+	// fee of 1000, this equates to values less than 546 atom being
 	// considered dust.
 	//
 	// The following is equivalent to (value/totalSize) * (1/3) * 1000

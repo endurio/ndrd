@@ -50,7 +50,7 @@ var (
 	// opcode.  It is defined here to reduce garbage creation.
 	opTrueScript = []byte{txscript.OP_TRUE}
 
-	// lowFee is a single satoshi and exists to make the test code more
+	// lowFee is a single atom and exists to make the test code more
 	// readable.
 	lowFee = types.Amount(1)
 )

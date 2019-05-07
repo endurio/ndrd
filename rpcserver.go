@@ -600,14 +600,14 @@ func handleCreateRawTransaction(s *rpcServer, cmd interface{}, closeChan <-chan 
 			return nil, internalRPCError(err.Error(), context)
 		}
 
-		// Convert the amount to satoshi.
-		satoshi, err := types.NewAmount(amount)
+		// Convert the amount to atom.
+		atom, err := types.NewAmount(amount)
 		if err != nil {
 			context := "Failed to convert amount"
 			return nil, internalRPCError(err.Error(), context)
 		}
 
-		txOut := wire.NewTxOut(int64(satoshi), pkScript)
+		txOut := wire.NewTxOut(int64(atom), pkScript)
 		mtx.AddTxOut(txOut)
 	}
 

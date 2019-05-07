@@ -232,7 +232,7 @@ func CheckTransactionSanity(tx *chainutil.Tx) error {
 	// output must not be negative or more than the max allowed per
 	// transaction.  Also, the total of all outputs must abide by the same
 	// restrictions.  All amounts in a transaction are in a unit value known
-	// as a satoshi.  One bitcoin is a quantity of satoshi as defined by the
+	// as a atom.  One bitcoin is a quantity of atom as defined by the
 	// AtomPerCoin constant.
 	var totalBalance types.Balance
 	for _, txOut := range msgTx.TxOut {
@@ -930,8 +930,8 @@ func CheckTransactionInputs(tx *chainutil.Tx, txHeight int32, utxoView *UtxoView
 		// Ensure the transaction amounts are in range.  Each of the
 		// output values of the input transactions must not be negative
 		// or more than the max allowed per transaction.  All amounts in
-		// a transaction are in a unit value known as a satoshi.  One
-		// bitcoin is a quantity of satoshi as defined by the
+		// a transaction are in a unit value known as a atom.  One
+		// bitcoin is a quantity of atom as defined by the
 		// AtomPerCoin constant.
 		originTxSatoshi := utxo.Amount()
 		if originTxSatoshi < 0 {
