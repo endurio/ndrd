@@ -181,35 +181,36 @@ func (b *Balance) Empty() bool {
 	return b.a0 == 0 && b.a1 == 0
 }
 
-func (b Balance) Big() *BigBalance {
-	var bb BigBalance
+func (b Balance) Big() *BalanceBig {
+	var bb BalanceBig
 	bb.a0.SetUint64(uint64(b.a0))
 	bb.a1.SetUint64(uint64(b.a1))
 	return &bb
 }
 
-type BigBalance struct {
+// BalanceBig is balance of big.Int
+type BalanceBig struct {
 	a0, a1 big.Int
 }
 
 var (
-	BigBalanceEmtpy = BigBalance{}
+	BalanceBigEmtpy = BalanceBig{}
 )
 
-func (b *BigBalance) Clone() *BigBalance {
-	var bb BigBalance
+func (b *BalanceBig) Clone() *BalanceBig {
+	var bb BalanceBig
 	bb.a0.Set(&b.a0)
 	bb.a1.Set(&b.a1)
 	return &bb
 }
 
-func (b *BigBalance) Add(bb *BigBalance) *BigBalance {
+func (b *BalanceBig) Add(bb *BalanceBig) *BalanceBig {
 	b.a0.Add(&b.a0, &bb.a0)
 	b.a1.Add(&b.a1, &bb.a1)
 	return b
 }
 
-func (b *BigBalance) Sub(bb *BigBalance) *BigBalance {
+func (b *BalanceBig) Sub(bb *BalanceBig) *BalanceBig {
 	b.a0.Sub(&b.a0, &bb.a0)
 	b.a1.Sub(&b.a1, &bb.a1)
 	return b
