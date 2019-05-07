@@ -9,7 +9,7 @@ const (
 	// AtomPerCent is the number of atom in one bitcoin cent.
 	AtomPerCent = 1e6
 
-	// AtomPerCoin is the number of atom in one bitcoin (1 BTC).
+	// AtomPerCoin is the number of atom in one bitcoin (1 Coin).
 	AtomPerCoin = 1e8
 
 	// MaxAtom is the maximum transaction amount allowed in atom.

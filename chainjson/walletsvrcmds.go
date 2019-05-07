@@ -455,7 +455,7 @@ func NewLockUnspentCmd(unlock bool, transactions []TransactionInput) *LockUnspen
 type MoveCmd struct {
 	FromAccount string
 	ToAccount   string
-	Amount      float64 // In BTC
+	Amount      float64 // In Coin
 	MinConf     *int    `jsonrpcdefault:"1"`
 	Comment     *string
 }
@@ -479,7 +479,7 @@ func NewMoveCmd(fromAccount, toAccount string, amount float64, minConf *int, com
 type SendFromCmd struct {
 	FromAccount string
 	ToAddress   string
-	Amount      float64 // In BTC
+	Amount      float64 // In Coin
 	Token       *string
 	MinConf     *int `jsonrpcdefault:"1"`
 	Comment     *string
@@ -506,7 +506,7 @@ func NewSendFromCmd(fromAccount, toAddress string, amount float64, token *string
 // SendManyCmd defines the sendmany JSON-RPC command.
 type SendManyCmd struct {
 	FromAccount string
-	Amounts     map[string]float64 `jsonrpcusage:"{\"address\":amount,...}"` // In BTC
+	Amounts     map[string]float64 `jsonrpcusage:"{\"address\":amount,...}"` // In Coin
 	Token       *string
 	MinConf     *int `jsonrpcdefault:"1"`
 	Comment     *string
@@ -553,7 +553,7 @@ func NewSendToAddressCmd(address string, amount float64, token, comment, comment
 
 // BidCmd defines the bid JSON-RPC command.
 type BidCmd struct {
-	Amount  float64 // In BTC
+	Amount  float64 // In Coin
 	Price   float64
 	MinConf *int `jsonrpcdefault:"1"`
 }
@@ -608,7 +608,7 @@ func NewSetAccountCmd(address, account string) *SetAccountCmd {
 
 // SetTxFeeCmd defines the settxfee JSON-RPC command.
 type SetTxFeeCmd struct {
-	Amount float64 // In BTC
+	Amount float64 // In Coin
 }
 
 // NewSetTxFeeCmd returns a new instance which can be used to issue a settxfee
