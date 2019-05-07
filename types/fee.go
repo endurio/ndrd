@@ -60,3 +60,22 @@ func (p Price) Rate(r PriceReq) (rate float64) {
 	}
 	return rate
 }
+
+func (b PriceReq) ToCoinPriceReq() CoinPriceReq {
+	var bc CoinPriceReq
+	bc.a0 = b.a0.ToCoin()
+	bc.a1 = b.a1.ToCoin()
+	return bc
+}
+
+// CoinPriceReq is balance of float64
+type CoinPriceReq struct {
+	a0, a1 float64
+}
+
+func (bc CoinPriceReq) ToPriceReq() PriceReq {
+	var b PriceReq
+	b.a0, _ = NewAmount(bc.a0)
+	b.a1, _ = NewAmount(bc.a1)
+	return b
+}
